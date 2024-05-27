@@ -7,6 +7,9 @@
 # conda env create -f env.yml
 # Then do, conda activate peptonizer
 
+# The input file that this script requires is a pout-file with rescored peptides
+# By default, it is called "rescored.psms.tsv"
+
 # Step 1: get taxonomy from pout
 python unipept_get_taxonomy_from_pout.py --unipept-response-file "../../data/unipept_response.json" --pep-out "../../data/peptides.out" --taxonomy-query "2" --fdr "0.01" --pout-file "../../sample_input/rescored.psms.tsv" --log-file "../../data/unipept.log"
 

@@ -1,7 +1,6 @@
 # implementation of belief propagation on a peptide-protein graph
 # __________________________________________________________________________________________
 import numpy as np
-import networkx as nx
 import math
 import pandas as pd
 
@@ -563,7 +562,7 @@ class Messages:
         max_residual = 100
 
         # first, do 5 loops where I update all messages
-        print("time per loop 0 0", end="")
+        print(f"Time spent in loop 0/{max_loops}: 0s", end="")
         for k in range(0, 5):
             start_t = time.time()
             self.ComputeUpdate()
@@ -571,7 +570,7 @@ class Messages:
             self.Msg.update(self.MsgNew)
             k += 1
             end_t = time.time()
-            print(f"\rtime per loop {k:.3f}s {end_t - start_t}", end="")
+            print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s", end="")
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
         for edge in self.Graph.edges():
@@ -601,7 +600,7 @@ class Messages:
 
         k = 5
 
-        print("time per loop 0 0 -> residual max 0")
+        print(f"\rTime spent in loop 0/{max_loops}: 0s -> residual max 0", end="")
         while k < max_loops and max_residual > tolerance:
             # actual zero-look-ahead-BP part
             start_t = time.time()
@@ -623,9 +622,11 @@ class Messages:
 
             # Only update the time per loop every 5 iterations
             if k % 5 == 0:
-                print(f"\rtime per loop {k} {(end_t - start_t):.3f} -> residual max {max_residual:.3f}", end="")
+                print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s -> residual max {max_residual:.3f}", end="")
 
             k += 1
+
+        print()
 
         # marginalize once the model has converged
         for variable in self.Graph.nodes():
@@ -672,7 +673,7 @@ class Messages:
 # calibration through message passing of all subgraphs in the List of factor graphs
 def CalibrateAllSubgraphs(ListOfCTFactorGraphs, MaxIterations, Tolerance, local=False):
     """
-    Performs bayesian inferencethrough loopy belief propgation, returns dictionary {variable:posterior_probability}
+    Performs bayesian inference through loopy belief propagation, returns dictionary {variable:posterior_probability}
     :param ListOfCTFactorGraphs: list, contains FactorGraph objects on which inference can be performed
     :param MaxIterations: int, max number of iterations in case of non-convergence
     :param Tolerance: float, error tolerance between messages for convergence criterion
@@ -688,7 +689,8 @@ def CalibrateAllSubgraphs(ListOfCTFactorGraphs, MaxIterations, Tolerance, local=
     ResultsDict = {}
     NodeDict = {}
 
-    for Graph in ListOfCTFactorGraphs:
+    for (idx, Graph) in enumerate(ListOfCTFactorGraphs):
+        print(f"Started calibrating subgraph {idx + 1} of {len(ListOfCTFactorGraphs)}.")
         if Graph.number_of_nodes() > 2:
             NodeDict.update(dict(Graph.nodes(data="category")))
             InitializedMessageObject = Messages(Graph)
@@ -701,19 +703,18 @@ def CalibrateAllSubgraphs(ListOfCTFactorGraphs, MaxIterations, Tolerance, local=
     return ResultsList, ResultsDict, NodeDict
 
 
-# save the resulstsdictionary from CalibrateAllSubgraphs to a csv file
 def SaveResultsToCsv(ResultsDict, NodeDict, NameString):
     """
     Save Loopy Belief Propagation results to .csv file
     :param ResultsDict: dict, {variable:posterior_probability}
     :param NodeDict: dict, dictionary of nodes that were in the factor graph and their attributes, to include the node category in the results
-    :param NameString: str, csv ouptut path
+    :param NameString: str, csv output path
     """
 
     if not isinstance(NameString, str):
         raise TypeError("AddNameString needs to a string with Info on your run")
     if not isinstance(ResultsDict, dict):
-        raise TypeError("Resultsdict must be diciontary")
+        raise TypeError("Resultsdict must be dictionary")
     if not isinstance(NodeDict, dict):
         raise TypeError("Resultsdict must be dictionary")
 
