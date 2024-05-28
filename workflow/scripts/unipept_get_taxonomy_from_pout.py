@@ -39,7 +39,7 @@ parser.add_argument(
     required=True,
     help="Input: paths to percolator (ms2rescore) '.pout' files.",
 )
-parser.add_argument("--pep-out", type=str, required=True, help="Path to output file that contains all queried peptide counts (which should be used in the next step).")
+parser.add_argument("--unipept-peptide-counts", type=str, required=True, help="Path to output file that contains all queried peptide counts (which should be used in the next step).")
 parser.add_argument(
     "--log-file",
     type=str,
@@ -351,7 +351,7 @@ for peptide in pep_score_psm.keys():
             "score": pep_score_psm[peptide][0],
             "psms": pep_score_psm[peptide][1],
         }
-with open(args.pep_out, "a") as f_out:
+with open(args.unipept_peptide_counts, "a") as f_out:
     f_out.write(json.dumps(UnipeptPeptides))
 
 # get and save Info from Unipept if the response file doesn't exist yet

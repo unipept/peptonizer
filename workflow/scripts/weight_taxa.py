@@ -38,12 +38,12 @@ def init_argparser():
         help="Output: path to a CSV-file that will contain all computed taxa weights.",
     )
     parser.add_argument(
-        "--unipept-peptides",
+        "--unipept-peptide-counts",
         type=str,
         required=True,
     )
     parser.add_argument(
-        "--taxa-rank",
+        "--taxon-rank",
         type=str,
         required=False,
         default="species",
@@ -249,9 +249,9 @@ def WeightTaxa(
 args = init_argparser()
 DF, Weights = WeightTaxa(
     args.unipept_response_file,
-    args.unipept_peptides,
+    args.unipept_peptide_counts,
     args.number_of_taxa,
-    TaxaRank=args.taxa_rank,
+    TaxaRank=args.taxon_rank,
 )
 print("Started dumping produced results to CSV-files...")
 DF.to_csv(args.out)
