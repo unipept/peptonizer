@@ -8,6 +8,8 @@ logs/
 # dotenv
 .env
 
+.snakemake/
+
 # virtualenv
 .venv
 venv/
