@@ -1,5 +1,7 @@
 data/
-sample_input/
+old_data/
+resources/
+logs/
 
 .idea/
 
