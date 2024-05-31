@@ -2,6 +2,7 @@ data/
 old_data/
 resources/
 logs/
+benchmarks/
 
 .idea/
 
