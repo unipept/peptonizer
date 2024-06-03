@@ -170,7 +170,7 @@ class Messages:
     Functions execute loopy residual belief propagation with zero look ahead
     """
 
-    # class that holds the messages of itereation t and iteration t+1 as dictionaries
+    # class that holds the messages of iteration t and iteration t+1 as dictionaries
 
     def __init__(self, CTGraphIn):
         self.Msg = {}
@@ -468,13 +468,6 @@ class Messages:
 
         for EndNeighbors in self.Graph.neighbors(EndName):
             if EndNeighbors != StartName:
-                check = np.sum(
-                    [
-                        self.TotalResiduals[(SumRun, EndName), (EndName, EndNeighbors)]
-                        for SumRun in self.Graph.neighbors(EndName)
-                        if SumRun != EndNeighbors
-                    ]
-                )
                 self.priorities[EndName, EndNeighbors] = np.sum(
                     [
                         self.TotalResiduals[(SumRun, EndName), (EndName, EndNeighbors)]
@@ -483,9 +476,6 @@ class Messages:
                     ]
                 )
 
-        # for startNeighbors in self.Graph.neighbors(StartName):
-        #    if startNeighbors != EndName:
-        #        self.priorities[startNeighbors,EndName] = np.sum([self.TotalResiduals[(SumRun,EndName),(EndName,EndNeighbors)] for SumRun in self.Graph.neighbors(EndName) if SumRun != EndNeighbors])
 
     # computes new message for a given edge (startname,endname) in the direction startname->endname
     def SingleEdgeDirectionUpdate(self, StartName, EndName):
@@ -548,8 +538,13 @@ class Messages:
         return Residual[self.MaxVal]
 
     def getPriorityMessage(self, PriorityVector):
+        print("Length of the priority vector:")
+        print(len(PriorityVector))
+        print("Content of first key,value pair:")
+        key = next(iter(PriorityVector))
+        print(f"({key}, {PriorityVector[key]})")
         self.Maxval = max(PriorityVector, key=PriorityVector.get)
-        return max(PriorityVector, key=PriorityVector.get)
+        return self.Maxval
 
     def ZeroLookAheadLoopyLoop(self, max_loops, tolerance, local=False):
         """
@@ -604,7 +599,6 @@ class Messages:
         while k < max_loops and max_residual > tolerance:
             # actual zero-look-ahead-BP part
             start_t = time.time()
-            # print(self.getPriorityMessage(self.priorities))
             priority_message = self.getPriorityMessage(self.priorities)
             max_residual = self.priorities[priority_message]
             self.SingleEdgeDirectionUpdate(priority_message[0], priority_message[1])
