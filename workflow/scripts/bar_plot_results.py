@@ -35,7 +35,7 @@ Script that takes PepGM .csv output, translates taxIDS to scientific names, and 
 ncbi = NCBITaxa()
 
 # read csv using pandas
-IDs = pd.read_csv(args.ResultsFile, names=["ID", "score", "type"])
+IDs = pd.read_csv(args.results_file, names=["ID", "score", "type"])
 TaxIDS = IDs.loc[IDs["type"] == "taxon"]
 TaxIDS = TaxIDS.dropna()
 
@@ -52,13 +52,13 @@ Scores = TaxIDS["score"]
 fig, ax = plt.subplots()
 fig.set_size_inches(30, 15)
 bars = ax.barh(
-    range(len(TaxaNames[-args.NumberofResults :])),
-    Scores[-args.NumberofResults :],
+    range(len(TaxaNames[-args.number_of_results :])),
+    Scores[-args.number_of_results :],
     color="royalblue",
 )
 
-ax.set_yticks(range(len(TaxaNames[-args.NumberofResults :])))
-ax.set_yticklabels(TaxaNames[-args.NumberofResults :], fontsize=25)
+ax.set_yticks(range(len(TaxaNames[-args.number_of_results :])))
+ax.set_yticklabels(TaxaNames[-args.number_of_results :], fontsize=25)
 plt.xlim((0, 1))
 plt.xlabel("Posterior probability", fontsize=35)
 ax.xaxis.set_ticks(np.arange(0, 1.2, 0.2))
@@ -83,5 +83,5 @@ for bar in bars:
 
 fig.tight_layout()
 
-plt.savefig(args.ResultsFile.replace(".csv", ".png"))
+plt.savefig(args.results_file.replace(".csv", ".png"))
 plt.close()
