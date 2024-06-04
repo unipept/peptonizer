@@ -9,7 +9,6 @@ from scipy.signal import fftconvolve
 from factor_graph_generation import *
 from scipy.special import logsumexp
 from pqdict import pqdict
-from numba import jit
 
 import time
 

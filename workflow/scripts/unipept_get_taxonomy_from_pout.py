@@ -2,7 +2,6 @@ import requests
 import json
 import re
 import os.path
-from ete3 import NCBITaxa
 import argparse
 import logging
 import time
@@ -10,6 +9,9 @@ import asyncio
 import aiohttp
 import aiofiles
 import sys
+import gzip
+
+from ete3 import NCBITaxa
 
 UNIPEPT_URL = "http://rick.ugent.be/mpa/pept2filtered.json"
 
@@ -69,7 +71,7 @@ def Poutparser(pout_files, fdr_threshold, decoy_flag):
     pep_score_psm = dict()
 
     for pout_file in pout_files:
-        with open(pout_file, "r") as f:
+        with gzip.open(pout_file, "r") as f:
             next(f)  # skip header
             for line in f:
                 # skip empty lines
