@@ -3,9 +3,6 @@ import networkx as nx
 from collections import namedtuple
 import pandas as pd
 
-pep_length = 3
-
-
 def normalize(array):
     return array / np.sum(array)
 
@@ -16,14 +13,13 @@ def avoid_underflow(array):
 
 
 class ProteinPeptideGraph(nx.Graph):
+    # Class for storing the protein-peptide graph with scores and priors but no factors, e.g for visual representation.
     pass
-
-    # class for storing the protein-peptide graph with scores and priors but no factors, e.g for visual representation
 
 
 class TaxonGraph(nx.Graph):
     """
-    class with functions to construct a peptide-taxon graph using entrez/ncbi mapping
+    Class with functions to construct a peptide-taxon graph using Entrez/NCBI mapping.
     """
 
     def __init__(self):
@@ -173,7 +169,7 @@ class CTFactorGraph(FactorGraph):
         elif GraphType == "Protein":
             self.category = "protein"
 
-        if type(GraphIn) == str:
+        if isinstance(GraphIn, str):
             GraphIn = nx.read_graphml(GraphIn)
 
         # need these to create a new instance of a CT fractorgraph and not overwrite the previous graph
@@ -230,7 +226,7 @@ class CTFactorGraph(FactorGraph):
     def ComputeNetworkAttributes(self):
         """
         Computes nodes attributes using builtin networkx functions
-        Returns degree centrality, closenesscentrality, betweennesscentrality and eigencentrality
+        Returns degree centrality, closeness centrality, betweenness centrality and eigen centrality
         """
         DegreeCentrality = dict(
             sorted(nx.degree_centrality(self).items(), key=lambda item: item[1])

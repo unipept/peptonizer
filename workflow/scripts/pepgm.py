@@ -1,4 +1,6 @@
 import argparse
+import networx as nx
+
 from zero_lookahead_belief_propagation import *
 from factor_graph_generation import *
 

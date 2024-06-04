@@ -2,24 +2,23 @@
 # __________________________________________________________________________________________
 import numpy as np
 import math
+import json
 import pandas as pd
 
 from scipy.signal import fftconvolve
 from factor_graph_generation import *
 from scipy.special import logsumexp
+from pqdict import pqdict
+from numba import jit
 
 import time
-
-
-# set numpy to raise errors
-# np.seterr(all='raise')
 
 
 def normalize(array):
     return array / np.sum(array)
 
 
-# normalization of log propabilities
+# normalization of log probabilities
 def log_normalize(array):
     try:
         y = np.exp(array - logsumexp(array))
@@ -62,10 +61,9 @@ class CTNode:
     # passing messages up : subtracting variables
     def messageUp(self, answerSize, otherJointVector):
         startingPoint = len(otherJointVector) - 1
-        resultcheck = fftconvolve(otherJointVector[::-1], self.likelihoodBelow)
         result = fftconvolve(otherJointVector[::-1], self.likelihoodBelow)[
-            startingPoint : startingPoint + answerSize
-        ]
+                 startingPoint: startingPoint + answerSize
+                 ]
 
         return normalize(result)
 
@@ -110,7 +108,7 @@ class ConvolutionTree:
         # number of variables is a power of 2; this is not the most
         # efficient method for this. because they are absent, they won't influence the
         # total sum, and thus Ds.
-        for i in range(0, 2**self.logLength - len(proteins)):
+        for i in range(0, 2 ** self.logLength - len(proteins)):
             # this protein cannot be present, therefor set propbaility array to (0,1)
             layer.append(CTNode([np.array([1, 0])]))  # TODO change this order
 
@@ -161,7 +159,7 @@ class ConvolutionTree:
         return self.proteinLayer[protInd].MessagesUp()
 
     def MessageToSharedLikelihood(self):
-        return self.LastNode.jointAbove[0][0 : (self.nProteins + 1)]
+        return self.LastNode.jointAbove[0][0: (self.nProteins + 1)]
 
 
 class Messages:
@@ -172,266 +170,244 @@ class Messages:
 
     # class that holds the messages of iteration t and iteration t+1 as dictionaries
 
-    def __init__(self, CTGraphIn):
-        self.Msg = {}
-        self.MsgNew = {}
-        self.MsgLog = {}
-        self.Graph = CTGraphIn
-        self.MaxVal = None
-        self.FullResidual = {}
-        self.FullResidualNew = {}
-        self.InitialBeliefs = {}
-        self.CurrentBeliefs = {}
-        self.CurrentBeliefsNew = {}
+    def __init__(self, ct_graph_in):
+        self.msg = {}
+        self.msg_new = {}
+        self.msg_log = {}
+        self.graph = ct_graph_in
+        self.max_val = None
+        self.full_residual = {}
+        self.initial_beliefs = {}
+        self.current_beliefs = {}
         self.queue = {}
-        self.priorities = {}
-        self.category = CTGraphIn.category
-        self.TotalResiduals = {}
+        self.priorities = pqdict({}, reverse=True)
+        self.category = ct_graph_in.category
+        self.total_residuals = {}
         # TODO check if I truly need all three of msg new, msglog and msg. chech if i need both fullresidual and fullresidual new,
 
-        for node in CTGraphIn.nodes(data=True):
+        for node in ct_graph_in.nodes(data=True):
             if node[1]["category"] == "factor":
-                self.InitialBeliefs[node[0]] = node[1]["InitialBelief"].Factor.array
+                self.initial_beliefs[node[0]] = node[1]["InitialBelief"].Factor.array
             elif (
-                node[1]["category"] == "peptide"
-                or node[1]["category"] == CTGraphIn.category
+                    node[1]["category"] == "peptide"
+                    or node[1]["category"] == ct_graph_in.category
             ):
-                self.InitialBeliefs[node[0]] = np.array(
+                self.initial_beliefs[node[0]] = np.array(
                     [node[1]["InitialBelief_0"], node[1]["InitialBelief_1"]]
                 )
             else:
-                self.InitialBeliefs[node[0]] = np.ones(
+                self.initial_beliefs[node[0]] = np.ones(
                     4
                 )  # this entry will never be used as the convolution trees do not hold beliefs
 
-        self.CurrentBeliefs = self.InitialBeliefs.copy()
-        self.CurrentBeliefsNew = self.InitialBeliefs.copy()
+        self.current_beliefs = self.initial_beliefs.copy()
 
-        for node1, node2, data in CTGraphIn.edges(data=True):
-            StartName, EndName = node1, node2
-
-            if "MessageLength" in data:
-                self.Msg[(StartName, EndName)] = np.ones(data["MessageLength"])
-            else:
-                self.Msg[(StartName, EndName)] = np.array([0.5, 0.5])
-
-            self.Msg[(EndName, StartName)] = self.Msg[(StartName, EndName)]
+        for node1, node2, data in ct_graph_in.edges(data=True):
+            start_name, end_name = node1, node2
 
             if "MessageLength" in data:
-                self.MsgNew[(StartName, EndName)] = np.ones(data["MessageLength"])
+                self.msg[(start_name, end_name)] = np.ones(data["MessageLength"])
             else:
-                self.MsgNew[(StartName, EndName)] = np.array([0, 0])
+                self.msg[(start_name, end_name)] = np.array([0.5, 0.5])
 
-            self.MsgNew[(EndName, StartName)] = self.MsgNew[(StartName, EndName)]
+            self.msg[(end_name, start_name)] = self.msg[(start_name, end_name)]
 
-        self.MsgLog = self.MsgNew.copy()
+            if "MessageLength" in data:
+                self.msg_new[(start_name, end_name)] = np.ones(data["MessageLength"])
+            else:
+                self.msg_new[(start_name, end_name)] = np.array([0, 0])
+
+            self.msg_new[(end_name, start_name)] = self.msg_new[(start_name, end_name)]
+
+        self.msg_log = self.msg_new.copy()
 
     # variables (peptides,proteins,taxa)
-    def GetIncomingMessageVariable(self, Node, NodeIN):
-        returnedMessage = self.Msg[Node, NodeIN]
-        return returnedMessage
+    def get_incoming_message_variable(self, node, node_in):
+        return self.msg[node, node_in]
 
-    def ComputeOutMessageVariable(self, NodeOUT, NodeIN):
-        IncomingMessages = []
-        NodeBelief = self.CurrentBeliefs[NodeOUT]
-        for NodeOUTneighbors in self.Graph.neighbors(NodeOUT):
-            if NodeOUTneighbors != NodeIN:
-                IncomingMessages.append(
-                    self.GetIncomingMessageVariable(NodeOUTneighbors, NodeOUT)
+    def compute_out_message_variable(self, node_out, node_in):
+        incoming_messages = []
+        node_belief = self.current_beliefs[node_out]
+        for node_out_neighbor in self.graph.neighbors(node_out):
+            if node_out_neighbor != node_in:
+                incoming_messages.append(
+                    self.get_incoming_message_variable(node_out_neighbor, node_out)
                 )
 
-        if not IncomingMessages:
-            check = any(NodeBelief == self.InitialBeliefs[NodeOUT])
-            if any(NodeBelief == self.InitialBeliefs[NodeOUT]):
-                return NodeBelief
-            else:
-                return self.Msg[NodeOUT, NodeIN]
+        if not incoming_messages:
+            # TODO Tanja: what exactly do you want to compare here?
+            return node_belief if any(node_belief == self.initial_beliefs[node_out]) else self.msg[node_out, node_in]
 
-        else:
-            # need for logs to prevent underflow in very large multiplications
-            IncomingMessages = np.asarray(np.log(IncomingMessages)).reshape(
-                len(IncomingMessages), 2
+        # need for logs to prevent underflow in very large multiplications
+        incoming_messages = np.asarray(np.log(incoming_messages)).reshape(
+            len(incoming_messages), 2
+        )
+
+        out_message_log = log_normalize(
+            np.asarray(
+                [
+                    np.sum([np.log(node_belief[0]), np.sum(incoming_messages[:, 0])]),
+                    np.sum([np.log(node_belief[1]), np.sum(incoming_messages[:, 1])]),
+                ]
             )
-            OutMessageLog = log_normalize(
-                np.asarray(
-                    [
-                        np.sum([np.log(NodeBelief[0]), np.sum(IncomingMessages[:, 0])]),
-                        np.sum([np.log(NodeBelief[1]), np.sum(IncomingMessages[:, 1])]),
-                    ]
-                )
-            )
-            if np.isnan(np.sum(OutMessageLog)) == True:
-                stoppoint = 3
-            if not np.all(OutMessageLog):
-                OutMessageLog[OutMessageLog == 0] = 1e-30
-                stoppoint = 5
-            return OutMessageLog
+        )
+
+        if not np.all(out_message_log):
+            out_message_log[out_message_log == 0] = 1e-30
+
+        return out_message_log
 
     # factors (Conditional probability tables), handles different dimension of output/input variables
-    def GetIncomingMessageFactor(self, Node, NodeIN):
-        check1 = self.Msg[Node, NodeIN]
-        check2 = self.MsgLog[Node, NodeIN]
-        returnedMessage = self.Msg[Node, NodeIN]
-        return returnedMessage
+    def get_incoming_message_factor(self, node, node_in):
+        return self.msg[node, node_in]
 
-    def ComputeOutMessageFactor(self, NodeOUT, NodeIN):
-        IncomingMessages = []
-        NodeBelief = self.CurrentBeliefs[NodeOUT]
+    def compute_out_message_factor(self, node_out, node_in):
+        incoming_messages = []
+        node_belief = self.current_beliefs[node_out]
 
-        for NodeOUTneighbors in self.Graph.neighbors(NodeOUT):
-            if NodeOUTneighbors != NodeIN:
-                if [self.GetIncomingMessageFactor(NodeOUTneighbors, NodeOUT)]:
+        for node_out_neighbour in self.graph.neighbors(node_out):
+            if node_out_neighbour != node_in:
+                if [self.get_incoming_message_factor(node_out_neighbour, node_out)]:
                     # only the messages that have changed get multiplied into the current belief again
-                    IncomingMessages.append(
-                        self.GetIncomingMessageFactor(NodeOUTneighbors, NodeOUT)
+                    incoming_messages.append(
+                        self.get_incoming_message_factor(node_out_neighbour, node_out)
                     )
 
-        if self.Graph.nodes[NodeIN]["category"] == "Convolution Tree":
+        if self.graph.nodes[node_in]["category"] == "Convolution Tree":
             # handles empty & messages with only one value
-            IncomingMessages.append([1.0, 1.0])
-            IncomingMessages = np.asarray(IncomingMessages).reshape(
-                len(IncomingMessages), 2
+            incoming_messages.append([1.0, 1.0])
+            incoming_messages = np.asarray(incoming_messages).reshape(
+                len(incoming_messages), 2
             )  # np.asarray(np.log(IncomingMessages)).reshape(len(IncomingMessages),2)
-            OutMessages = normalize(
+            out_messages = normalize(
                 np.multiply(
-                    NodeBelief,
-                    [np.prod(IncomingMessages[:, 0]), np.prod(IncomingMessages[:, 1])],
+                    node_belief,
+                    [np.prod(incoming_messages[:, 0]), np.prod(incoming_messages[:, 1])],
                 )
             )  # lognormalize(np.add(np.log(NodeBelief),[np.sum(IncomingMessages[:,0]),np.sum(IncomingMessages[:,1])]))#
-            # self.CurrentBeliefsNew[NodeOUT] = OutMessages
 
-            return np.add(OutMessages[:, 0], OutMessages[:, 1])
+            return np.add(out_messages[:, 0], out_messages[:, 1])
         else:
-            if np.asarray(IncomingMessages[0]).shape[0] > 2:
-                IncomingMessagesShaped = np.asarray(IncomingMessages).reshape(
-                    IncomingMessages[0].shape[0], 1
-                )
-                # OutMessages = normalize(NodeBelief*IncomingMessagesShaped)
-
-                IncomingMessagesLog = np.log(
-                    np.asarray(IncomingMessages).reshape(
-                        IncomingMessages[0].shape[0], 1
+            if np.asarray(incoming_messages[0]).shape[0] > 2:
+                incoming_messages_log = np.log(
+                    np.asarray(incoming_messages).reshape(
+                        incoming_messages[0].shape[0], 1
                     )
                 )
                 # catch warning for log(0)
 
-                LogBelief = np.log(NodeBelief)
-                OutMessagesLog = log_normalize(np.add(LogBelief, IncomingMessagesLog))
-                # if not np.all([np.sum(OutMessages[0,:]),np.sum(OutMessages[1,:])]):
-                #    stoopoint = 4
-                if not np.all(OutMessagesLog):
-                    OutMessagesLog[OutMessagesLog == 0] = 1e-30
-                    stooptpoint = 5
+                log_belief = np.log(node_belief)
+                out_messages_log = log_normalize(np.add(log_belief, incoming_messages_log))
+                if not np.all(out_messages_log):
+                    out_messages_log[out_messages_log == 0] = 1e-30
 
-                return [np.sum(OutMessagesLog[0, :]), np.sum(OutMessagesLog[1, :])]
+                return [np.sum(out_messages_log[0, :]), np.sum(out_messages_log[1, :])]
             else:
-                IncomingMessages.append([1.0, 1.0])
-                IncomingMessages = np.asarray(IncomingMessages).reshape(
-                    len(IncomingMessages), 2
+                incoming_messages.append([1.0, 1.0])
+                incoming_messages = np.asarray(incoming_messages).reshape(
+                    len(incoming_messages), 2
                 )
-                OutMessages = normalize(
+                out_messages = normalize(
                     np.multiply(
-                        NodeBelief,
+                        node_belief,
                         [
-                            np.prod(IncomingMessages[:, 0]),
-                            np.prod(IncomingMessages[:, 1]),
+                            np.prod(incoming_messages[:, 0]),
+                            np.prod(incoming_messages[:, 1]),
                         ],
                     )
                 )
-                return [np.sum(OutMessages[0, :]), np.sum(OutMessages[1, :])]
+                return [np.sum(out_messages[0, :]), np.sum(out_messages[1, :])]
 
                 # CTree, computes all out messages in one go
 
-    def ComputeOutMessagesCTtree(self, Node):
-        ProtProbList = []
-        OldProtProbList = []
-        sharedLikelihoods = np.ones(self.Graph.nodes[Node]["NumberOfParents"] + 1)
+    def compute_out_messages_ct_tree(self, node):
+        prot_prob_list = []
+        old_prot_prob_list = []
+        shared_likelihoods = np.ones(self.graph.nodes[node]["NumberOfParents"] + 1)
         peptides = []
-        ProtList = []
-        self.CurrentBeliefsNew[Node] = np.ones(4)
+        prot_list = []
 
-        for NodesIN in self.Graph.neighbors(Node):
-            if "CPD" not in str(NodesIN):
-                if type(self.Msg[NodesIN, Node]) == list:
-                    ProtProbList.append([self.Msg[NodesIN, Node]])
+        for node_in in self.graph.neighbors(node):
+            if "CPD" not in str(node_in):
+                if isinstance(self.msg[node_in, node], list):
+                    prot_prob_list.append([self.msg[node_in, node]])
                 else:
-                    ProtProbList.append([self.Msg[NodesIN, Node].tolist()])
+                    prot_prob_list.append([self.msg[node_in, node].tolist()])
 
-                if type(self.MsgLog[NodesIN, Node]) == list:
-                    OldProtProbList.append([self.MsgLog[NodesIN, Node]])
+                if isinstance(self.msg_log[node_in, node], list):
+                    old_prot_prob_list.append([self.msg_log[node_in, node]])
                 else:
-                    OldProtProbList.append([self.MsgLog[NodesIN, Node].tolist()])
+                    old_prot_prob_list.append([self.msg_log[node_in, node].tolist()])
 
-                ProtList.append(NodesIN)
+                prot_list.append(node_in)
             else:
-                peptides.append(NodesIN)
+                peptides.append(node_in)
                 try:
-                    sharedLikelihoods = np.multiply(
-                        avoid_underflow(sharedLikelihoods), self.Msg[NodesIN, Node]
+                    shared_likelihoods = np.multiply(
+                        avoid_underflow(shared_likelihoods), self.msg[node_in, node]
                     )
                 except:
-                    print(sharedLikelihoods, self.Msg[NodesIN, Node])
-                OldSharedLikelihoods = np.multiply(
-                    avoid_underflow(sharedLikelihoods), self.MsgLog[NodesIN, Node]
+                    print(shared_likelihoods, self.msg[node_in, node])
+                old_shared_likelihoods = np.multiply(
+                    avoid_underflow(shared_likelihoods), self.msg_log[node_in, node]
                 )
 
-        if all(OldSharedLikelihoods != sharedLikelihoods) and any(
-            [
-                (ProtProbList[i][0]) != (OldProtProbList[i][0])
-                for i in range(len(ProtProbList))
-            ]
+        # TODO Tanja: what are you trying to compare here? Do you want to check if all values in these lists
+        # are different?
+        if all(old_shared_likelihoods != shared_likelihoods) and any(
+                [
+                    (prot_prob_list[i][0]) != (old_prot_prob_list[i][0])
+                    for i in range(len(prot_prob_list))
+                ]
         ):
-            # only update when the shared likelihhods or at least on of the protein messages has changed
-            CT = ConvolutionTree(sharedLikelihoods, ProtProbList)
+            # only update when the shared likelihoods or at least on of the protein messages has changed
+            ct = ConvolutionTree(shared_likelihoods, prot_prob_list)
 
-            for protein in range(len(ProtList)):
-                self.MsgNew[Node, ProtList[protein]] = CT.MessageToVariable(protein)
-                if not np.all(self.MsgNew[Node, ProtList[protein]]):
-                    self.MsgNew[Node, ProtList[protein]][
-                        self.MsgNew[Node, ProtList[protein]] == 0
-                    ] = 1e-30
-                    stop = 3
+            for protein in range(len(prot_list)):
+                self.msg_new[node, prot_list[protein]] = ct.MessageToVariable(protein)
+                if not np.all(self.msg_new[node, prot_list[protein]]):
+                    self.msg_new[node, prot_list[protein]][
+                        self.msg_new[node, prot_list[protein]] == 0
+                        ] = 1e-30
 
             for pep in peptides:
-                self.MsgNew[Node, pep] = CT.MessageToSharedLikelihood()
-                if not np.all(self.MsgNew[Node, pep]):
-                    self.MsgNew[Node, pep][self.MsgNew[Node, pep] < 1e-30] = 1e-30
-                    stopp = 5
+                self.msg_new[node, pep] = ct.MessageToSharedLikelihood()
+                if not np.all(self.msg_new[node, pep]):
+                    self.msg_new[node, pep][self.msg_new[node, pep] < 1e-30] = 1e-30
 
         else:
-            for protein in range(len(ProtList)):
-                self.MsgNew[Node, ProtList[protein]] = self.Msg[Node, ProtList[protein]]
+            for protein in range(len(prot_list)):
+                self.msg_new[node, prot_list[protein]] = self.msg[node, prot_list[protein]]
 
             for pep in peptides:
-                self.MsgNew[Node, pep] = self.Msg[Node, pep]
+                self.msg_new[node, pep] = self.msg[node, pep]
 
     # keeps track of which CTs have been update already in the current computeUpdate() loop
     def CTupdatecheck(self, CT):
         if CT in self.ListOfCTs:
             return False
         else:
-            self.ListOfCTs.append(CT)
+            self.ListOfCTs.add(CT)
             return True
 
     # computes the residual between message new/message for a give edge(nodein/nodeOUT)
     def ComputeResidual(self, NodeIN, NodeOUT):
-        Msg1 = self.MsgNew[NodeIN, NodeOUT]
-        Msg2 = self.Msg[NodeIN, NodeOUT]
+        Msg1 = self.msg_new[NodeIN, NodeOUT]
+        Msg2 = self.msg[NodeIN, NodeOUT]
         print(Msg1, Msg2)
-        if len(self.MsgNew[NodeIN, NodeOUT]) != len(self.Msg[NodeIN, NodeOUT]):
-            Msg2 = [1] * len(self.MsgNew[NodeIN, NodeOUT])
+        if len(self.msg_new[NodeIN, NodeOUT]) != len(self.msg[NodeIN, NodeOUT]):
+            Msg2 = [1] * len(self.msg_new[NodeIN, NodeOUT])
         return np.sum(np.abs(np.subtract(Msg1, Msg2)))
 
     def ComputeInfinityNormResidual(self, StartName, EndName):
-        Msg1 = self.Msg[StartName, EndName]
-        Msg2 = self.MsgLog[StartName, EndName]
-        if len(self.MsgLog[StartName, EndName]) != len(self.Msg[StartName, EndName]):
-            Msg2 = [1] * len(self.Msg[StartName, EndName])
-        check = np.max(np.abs(np.log(np.divide(Msg1, Msg2))))
+        Msg1 = self.msg[StartName, EndName]
+        Msg2 = self.msg_log[StartName, EndName]
+        if len(self.msg_log[StartName, EndName]) != len(self.msg[StartName, EndName]):
+            Msg2 = [1] * len(self.msg[StartName, EndName])
         pos = 0
         for i in Msg1:
             if i < 1e-30:
-                Msg1[pos] == 1e-30
+                Msg1[pos] = 1e-30
             pos += 1
 
         return np.max(np.abs(np.log(np.divide(Msg1, Msg2))))
@@ -439,79 +415,75 @@ class Messages:
         # approximate residual with zero look-ahead
 
     def ComputeZeroLookAheadResidual(self, StartName, EndName):
-        NodeINneighbors = [nodes for nodes in self.Graph.neighbors(StartName)]
+        NodeINneighbors = [nodes for nodes in self.graph.neighbors(StartName)]
         NodeINneighbors.remove(EndName)
         ApproximateResidual = sum(
-            [self.FullResidual[(neighbors, StartName)] for neighbors in NodeINneighbors]
+            [self.full_residual[(neighbors, StartName)] for neighbors in NodeINneighbors]
         )
         return ApproximateResidual
 
     def ComputeTotalResiduals(self, StartName, EndName, CurrentResidual):
-        for startNeighbors in self.Graph.neighbors(StartName):
+        for startNeighbors in self.graph.neighbors(StartName):
             if startNeighbors != EndName:
-                self.TotalResiduals[
+                self.total_residuals[
                     ((startNeighbors, StartName), (StartName, EndName))
                 ] = 0
 
-        for EndNeighbors in self.Graph.neighbors(EndName):
+        for EndNeighbors in self.graph.neighbors(EndName):
             if EndNeighbors != StartName:
-                check = self.TotalResiduals[
-                    ((StartName, EndName), (EndName, EndNeighbors))
-                ]
-                self.TotalResiduals[((StartName, EndName), (EndName, EndNeighbors))] = (
-                    self.TotalResiduals[((StartName, EndName), (EndName, EndNeighbors))]
-                    + CurrentResidual
+                self.total_residuals[((StartName, EndName), (EndName, EndNeighbors))] = (
+                        self.total_residuals[((StartName, EndName), (EndName, EndNeighbors))]
+                        + CurrentResidual
                 )
 
-    def ComputePriority(self, StartName, EndName):
-        self.priorities[(StartName, EndName)] = 0
+    def compute_priority(self, start_name, end_name):
+        self.priorities[(start_name, end_name)] = 0
 
-        for EndNeighbors in self.Graph.neighbors(EndName):
-            if EndNeighbors != StartName:
-                self.priorities[EndName, EndNeighbors] = np.sum(
+        for end_neighbor in self.graph.neighbors(end_name):
+            if end_neighbor != start_name:
+                self.priorities[end_name, end_neighbor] = np.sum(
                     [
-                        self.TotalResiduals[(SumRun, EndName), (EndName, EndNeighbors)]
-                        for SumRun in self.Graph.neighbors(EndName)
-                        if SumRun != EndNeighbors
+                        self.total_residuals[(sum_run, end_name), (end_name, end_neighbor)]
+                        for sum_run in self.graph.neighbors(end_name)
+                        if sum_run != end_neighbor
                     ]
                 )
-
 
     # computes new message for a given edge (startname,endname) in the direction startname->endname
     def SingleEdgeDirectionUpdate(self, StartName, EndName):
         if (
-            self.Graph.nodes[StartName]["category"] == self.category
-            or self.Graph.nodes[StartName]["category"] == "peptide"
+                self.graph.nodes[StartName]["category"] == self.category
+                or self.graph.nodes[StartName]["category"] == "peptide"
         ):
-            self.MsgNew[StartName, EndName] = self.ComputeOutMessageVariable(
+            self.msg_new[StartName, EndName] = self.compute_out_message_variable(
                 StartName, EndName
             )
 
-        if self.Graph.nodes[StartName]["category"] == "Convolution Tree":
+        if self.graph.nodes[StartName]["category"] == "Convolution Tree":
             CTCheck = self.CTupdatecheck(StartName)
 
             if CTCheck:
-                self.ComputeOutMessagesCTtree(StartName)
+                self.compute_out_messages_ct_tree(StartName)
 
-        if self.Graph.nodes[StartName]["category"] == "factor":
-            self.MsgNew[StartName, EndName] = self.ComputeOutMessageFactor(
+        if self.graph.nodes[StartName]["category"] == "factor":
+            self.msg_new[StartName, EndName] = self.compute_out_message_factor(
                 StartName, EndName
             )
 
     # compute updated messages for all edges
     def ComputeUpdate(self, localloops=False):
-        self.ListOfCTs = []  # keeps track of which CT has already been active
+        self.ListOfCTs = set()  # keeps track of which CT has already been active
 
         if not isinstance(localloops, bool):
             raise TypeError("localloops needs to be boolean")
 
-        if localloops and self.MaxVal:
-            for EndName in self.Graph.neighbors(self.MaxVal[1]):
-                StartName = self.MaxVal[1]
+        if localloops and self.max_val:
+            for EndName in self.graph.neighbors(self.max_val[1]):
+                StartName = self.max_val[1]
                 self.SingleEdgeDirectionUpdate(StartName, EndName)
 
         else:
-            for edge in self.Graph.edges():
+            for edge in self.graph.edges():
                 # update all edges
                 StartName, EndName = edge[0], edge[1]
                 self.SingleEdgeDirectionUpdate(StartName, EndName)
@@ -519,32 +491,19 @@ class Messages:
                 StartName, EndName = edge[1], edge[0]
                 self.SingleEdgeDirectionUpdate(StartName, EndName)
 
-        # for edge in self.Graph.edges():
-        #    #compute all residuals of the messages in this loop
-        #    StartName, EndName = edge[1], edge[0]
-        #    self.FullResidual[(StartName, EndName)] = self.ComputeResidual(StartName, EndName)
-
-        #    StartName, EndName = edge[0], edge[1]
-        #    self.FullResidual[(StartName, EndName)] = self.ComputeResidual(StartName, EndName)
-
     def updateResidualMessage(self, Residual):
         """
         check which message Residual has the largest residual and updates that message in self.Msg
         :param Residual: dict, residuals of the last belief propagation iteration
         """
 
-        self.MaxVal = max(Residual, key=Residual.get)
-        self.Msg[self.MaxVal] = self.MsgNew[self.MaxVal]
-        return Residual[self.MaxVal]
+        self.max_val = max(Residual, key=Residual.get)
+        self.msg[self.max_val] = self.msg_new[self.max_val]
+        return Residual[self.max_val]
 
     def getPriorityMessage(self, PriorityVector):
-        print("Length of the priority vector:")
-        print(len(PriorityVector))
-        print("Content of first key,value pair:")
-        key = next(iter(PriorityVector))
-        print(f"({key}, {PriorityVector[key]})")
-        self.Maxval = max(PriorityVector, key=PriorityVector.get)
-        return self.Maxval
+        self.max_val = PriorityVector.top()
+        return self.max_val
 
     def ZeroLookAheadLoopyLoop(self, max_loops, tolerance, local=False):
         """
@@ -561,37 +520,37 @@ class Messages:
         for k in range(0, 5):
             start_t = time.time()
             self.ComputeUpdate()
-            self.MsgLog.update(self.Msg)
-            self.Msg.update(self.MsgNew)
+            self.msg_log.update(self.msg)
+            self.msg.update(self.msg_new)
             k += 1
             end_t = time.time()
             print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s", end="")
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
-        for edge in self.Graph.edges():
+        for edge in self.graph.edges():
             # compute all residuals of the messages in this loop
             StartName, EndName = edge[1], edge[0]
-            self.FullResidual[
+            self.full_residual[
                 (StartName, EndName)
             ] = self.ComputeInfinityNormResidual(StartName, EndName)
 
             # initialize the total residual to 0
-            for End2 in self.Graph.neighbors(EndName):
-                self.TotalResiduals[((StartName, EndName), (EndName, End2))] = 0
-                self.TotalResiduals[((End2, EndName), (EndName, StartName))] = 0
+            for End2 in self.graph.neighbors(EndName):
+                self.total_residuals[((StartName, EndName), (EndName, End2))] = 0
+                self.total_residuals[((End2, EndName), (EndName, StartName))] = 0
 
             StartName, EndName = edge[0], edge[1]
-            self.FullResidual[
+            self.full_residual[
                 (StartName, EndName)
             ] = self.ComputeInfinityNormResidual(StartName, EndName)
 
-            # set the priority vector once with copy of the previously calculated residuals
-            self.priorities = self.FullResidual.copy()
-
             # initialize the total residual to 0
-            for End2 in self.Graph.neighbors(EndName):
-                self.TotalResiduals[((StartName, EndName), (EndName, End2))] = 0
-                self.TotalResiduals[((End2, EndName), (EndName, StartName))] = 0
+            for End2 in self.graph.neighbors(EndName):
+                self.total_residuals[((StartName, EndName), (EndName, End2))] = 0
+                self.total_residuals[((End2, EndName), (EndName, StartName))] = 0
+
+        # set the priority vector once with copy of the previously calculated residuals
+        self.priorities = pqdict(self.full_residual.copy(), reverse=True)
 
         k = 5
 
@@ -605,34 +564,36 @@ class Messages:
             priority_residual = self.ComputeInfinityNormResidual(
                 priority_message[0], priority_message[1]
             )
-            self.MsgLog.update(self.Msg)
-            self.Msg.update(self.MsgNew)
+            self.msg_log.update(self.msg)
+            self.msg.update(self.msg_new)
             self.ComputeTotalResiduals(
                 priority_message[0], priority_message[1], priority_residual
             )
-            self.ComputePriority(priority_message[0], priority_message[1])
+            self.compute_priority(priority_message[0], priority_message[1])
 
             end_t = time.time()
 
             # Only update the time per loop every 5 iterations
             if k % 5 == 0:
-                print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s -> residual max {max_residual:.3f}", end="")
+                print(
+                    f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s -> residual max {max_residual:.3f}",
+                    end="")
 
             k += 1
 
         print()
 
         # marginalize once the model has converged
-        for variable in self.Graph.nodes():
+        for variable in self.graph.nodes():
             if (
-                self.Graph.nodes[variable]["category"] == self.category
-                or self.Graph.nodes[variable]["category"] == "peptide"
+                    self.graph.nodes[variable]["category"] == self.category
+                    or self.graph.nodes[variable]["category"] == "peptide"
             ):
                 IncomingMessages = []
 
-                for VariableNeighbors in self.Graph.neighbors(variable):
+                for VariableNeighbors in self.graph.neighbors(variable):
                     IncomingMessages.append(
-                        self.GetIncomingMessageVariable(VariableNeighbors, variable)
+                        self.get_incoming_message_variable(VariableNeighbors, variable)
                     )
 
                 # log to avoid overflow
@@ -644,13 +605,13 @@ class Messages:
                         [
                             np.sum(
                                 [
-                                    np.log(self.InitialBeliefs[variable][0]),
+                                    np.log(self.initial_beliefs[variable][0]),
                                     np.sum(IncomingMessages[:, 0]),
                                 ]
                             ),
                             np.sum(
                                 [
-                                    np.log(self.InitialBeliefs[variable][1]),
+                                    np.log(self.initial_beliefs[variable][1]),
                                     np.sum(IncomingMessages[:, 1]),
                                 ]
                             ),
@@ -658,7 +619,7 @@ class Messages:
                     )
                 )
 
-                self.CurrentBeliefs[variable] = LoggedVariableMarginal
+                self.current_beliefs[variable] = LoggedVariableMarginal
 
     def DetectOscillations(self):
         pass
@@ -683,16 +644,15 @@ def CalibrateAllSubgraphs(ListOfCTFactorGraphs, MaxIterations, Tolerance, local=
     ResultsDict = {}
     NodeDict = {}
 
-    for (idx, Graph) in enumerate(ListOfCTFactorGraphs):
-        print(f"Started calibrating subgraph {idx + 1} of {len(ListOfCTFactorGraphs)}.")
-        if Graph.number_of_nodes() > 2:
-            NodeDict.update(dict(Graph.nodes(data="category")))
-            InitializedMessageObject = Messages(Graph)
+    for (idx, graph) in enumerate(ListOfCTFactorGraphs):
+        if graph.number_of_nodes() > 2:
+            NodeDict.update(dict(graph.nodes(data="category")))
+            InitializedMessageObject = Messages(graph)
             InitializedMessageObject.ZeroLookAheadLoopyLoop(
                 MaxIterations, Tolerance, local
             )
-            ResultsList.append(InitializedMessageObject.CurrentBeliefs)
-            ResultsDict.update(InitializedMessageObject.CurrentBeliefs)
+            ResultsList.append(InitializedMessageObject.current_beliefs)
+            ResultsDict.update(InitializedMessageObject.current_beliefs)
 
     return ResultsList, ResultsDict, NodeDict
 
