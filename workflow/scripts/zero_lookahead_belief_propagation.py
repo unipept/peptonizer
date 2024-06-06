@@ -187,6 +187,8 @@ class Messages:
         self.number_of_parents = []
         # Keeps track of node IDs that are of the CPD type
         self.cpds = set()
+        # Keep track of all edges (with node IDs)
+        self.edges = []
 
         # Keeps track of residuals for edges in the graph
         self.full_residuals = {}
@@ -234,6 +236,8 @@ class Messages:
         for start_node, end_node, data in ct_graph_in.edges(data=True):
             start_node_id = self.node_descriptions[start_node]
             end_node_id = self.node_descriptions[end_node]
+
+            self.edges.append((start_node_id, end_node_id))
 
             if "MessageLength" in data:
                 self.msg[(start_node_id, end_node_id)] = np.ones(data["MessageLength"])
@@ -349,7 +353,6 @@ class Messages:
     def compute_out_messages_ct_tree(self, node):
         prot_prob_list = []
         old_prot_prob_list = []
-        # TODO: keep track of the number of parents in the init method of this class
         shared_likelihoods = np.ones(self.number_of_parents[node] + 1)
         peptides = []
         prot_list = []
@@ -496,14 +499,12 @@ class Messages:
                 self.single_edge_direction_update(start_node, end_node)
 
         else:
-            for edge in self.graph.edges():
+            for edge in self.edges:
                 # update all edges
-                # TODO: make sure that we don't need to translate the edge descriptions to the node ID here anymore.
-                start_node, end_node = self.node_descriptions[edge[0]], self.node_descriptions[edge[1]]
+                start_node, end_node = edge[0], edge[1]
                 self.single_edge_direction_update(start_node, end_node)
 
-                # TODO: make sure that we don't need to translate the edge descriptions to the node ID here anymore.
-                start_node, end_node = self.node_descriptions[edge[1]], self.node_descriptions[edge[0]]
+                start_node, end_node = edge[1], edge[0]
                 self.single_edge_direction_update(start_node, end_node)
 
     def update_residual_message(self, residual):
@@ -542,10 +543,9 @@ class Messages:
             print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s", end="")
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
-        for edge in self.graph.edges():
+        for edge in self.edges:
             # compute all residuals of the messages in this loop
-            # TODO fix node name -> id translations
-            start_node, end_node = self.node_descriptions[edge[1]], self.node_descriptions[edge[0]]
+            start_node, end_node = edge[1], edge[0]
             self.full_residuals[
                 (start_node, end_node)
             ] = self.compute_infinity_norm_residual(start_node, end_node)
@@ -555,8 +555,7 @@ class Messages:
                 self.total_residuals[((start_node, end_node), (end_node, end2))] = 0
                 self.total_residuals[((end2, end_node), (end_node, start_node))] = 0
 
-            # TODO fix node name -> id translations
-            start_node, end_node = self.node_descriptions[edge[0]], self.node_descriptions[edge[1]]
+            start_node, end_node = edge[0], edge[1]
             self.full_residuals[
                 (start_node, end_node)
             ] = self.compute_infinity_norm_residual(start_node, end_node)
