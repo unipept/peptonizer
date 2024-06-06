@@ -1,5 +1,5 @@
 import argparse
-import networx as nx
+import networkx as nx
 
 from zero_lookahead_belief_propagation import *
 from factor_graph_generation import *
@@ -63,11 +63,11 @@ ct_factor_graph.AddCTNodes()
 
 
 ct_factor_graphs = [
-    SeparateSubgraphs(ct_factor_graph, filternodes)
-    for filternodes in nx.connected_components(ct_factor_graph)
+    SeparateSubgraphs(ct_factor_graph, filter_nodes)
+    for filter_nodes in nx.connected_components(ct_factor_graph)
 ]
 
-result_list, results_dict, node_types = CalibrateAllSubgraphs(
+results_dict, node_types = calibrate_all_subgraphs(
     ct_factor_graphs, args.max_iter, args.tol
 )
-save = SaveResultsToCsv(results_dict, node_types, args.out)
+save = save_results_to_csv(results_dict, node_types, args.out)

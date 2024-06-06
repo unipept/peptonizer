@@ -71,7 +71,7 @@ def Poutparser(pout_files, fdr_threshold, decoy_flag):
     pep_score_psm = dict()
 
     for pout_file in pout_files:
-        with gzip.open(pout_file, "r") as f:
+        with gzip.open(pout_file, "rt") as f:
             next(f)  # skip header
             for line in f:
                 # skip empty lines
@@ -123,7 +123,7 @@ def MS2RescoreOutParser(pout_files, fdr_threshold, decoy_flag):
     pep_score_psm = dict()
 
     for pout_file in pout_files:
-        with open(pout_file, "r") as f:
+        with gzip.open(pout_file, "rt") as f:
             next(f)  # skip header
             for line in f:
                 # skip empty lines

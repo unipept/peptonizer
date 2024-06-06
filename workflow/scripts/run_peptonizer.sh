@@ -5,7 +5,7 @@
 
 # On first use of the script, run the following to install all dependencies into a new Conda environment
 # Make sure to start from a Docker image where mamba is already installed!
-# 1) conda create --name peptonizer
+# 1) conda env create -f env.yml (make sure to run this command from the workflow directory)
 # 2) mamba install -c conda-forge -c bioconda -n peptonizer snakemake
 # 3) conda activate peptonizer
 # 4) snakemake --use-conda --cores 1
