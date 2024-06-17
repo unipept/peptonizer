@@ -3,7 +3,11 @@
 import numpy as np
 import math
 import json
-import pandas as pdi
+import pandas as pd
+
+from numba import njit
+from numba.core import types
+from numba.typed import Dict
 
 from scipy.signal import fftconvolve
 from factor_graph_generation import *
@@ -197,9 +201,9 @@ class Messages:
         self.initial_beliefs = []
         self.current_beliefs = []
 
-        self.msg = {}
-        self.msg_new = {}
-        self.msg_log = {}
+        self.msg = Dict.empty(key_type=types.UniTuple(types.int64, 2), value_type=types.float64[:])
+        self.msg_new = Dict.empty(key_type=types.UniTuple(types.int64, 2), value_type=types.float64[:])
+        self.msg_log = Dict.empty(key_type=types.UniTuple(types.int64, 2), value_type=types.float64[:])
 
         for (node_id, node) in enumerate(ct_graph_in.nodes(data=True)):
             # Each node should occur exactly once
@@ -240,11 +244,11 @@ class Messages:
             self.edges.append((start_node_id, end_node_id))
 
             if "MessageLength" in data:
-                self.msg[(start_node_id, end_node_id)] = np.ones(data["MessageLength"])
-                self.msg_new[(start_node_id, end_node_id)] = np.ones(data["MessageLength"])
+                self.msg[(start_node_id, end_node_id)] = np.ones(data["MessageLength"], dtype=np.float64)
+                self.msg_new[(start_node_id, end_node_id)] = np.ones(data["MessageLength"], dtype=np.float64)
             else:
-                self.msg[(start_node_id, end_node_id)] = np.array([0.5, 0.5])
-                self.msg_new[(start_node_id, end_node_id)] = np.array([0, 0])
+                self.msg[(start_node_id, end_node_id)] = np.array([0.5, 0.5], dtype=np.float64)
+                self.msg_new[(start_node_id, end_node_id)] = np.array([0, 0], dtype=np.float64)
 
             self.msg[(end_node_id, start_node_id)] = self.msg[(start_node_id, end_node_id)]
             self.msg_new[(end_node_id, start_node_id)] = self.msg_new[(start_node_id, end_node_id)]
@@ -396,9 +400,7 @@ class Messages:
             for protein in range(len(prot_list)):
                 self.msg_new[node, prot_list[protein]] = ct.MessageToVariable(protein)
                 if not np.all(self.msg_new[node, prot_list[protein]]):
-                    self.msg_new[node, prot_list[protein]][
-                        self.msg_new[node, prot_list[protein]] == 0
-                        ] = 1e-30
+                    self.msg_new[node, prot_list[protein]][self.msg_new[node, prot_list[protein]] == 0] = 1e-30
 
             for pep in peptides:
                 self.msg_new[node, pep] = ct.MessageToSharedLikelihood()
