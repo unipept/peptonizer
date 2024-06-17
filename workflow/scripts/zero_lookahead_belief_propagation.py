@@ -208,21 +208,14 @@ class Messages:
         prot_prob_list = []
         old_prot_prob_list = []
         shared_likelihoods = np.ones(self.number_of_parents[node] + 1)
+        old_shared_likelihoods = None
         peptides = []
         prot_list = []
 
         for node_in in self.neighbours[node]:
             if node_in not in self.cpds:
-                if isinstance(self.msg[node_in, node], list):
-                    prot_prob_list.append([self.msg[node_in, node]])
-                else:
-                    prot_prob_list.append([self.msg[node_in, node].tolist()])
-
-                if isinstance(self.msg_log[node_in, node], list):
-                    old_prot_prob_list.append([self.msg_log[node_in, node]])
-                else:
-                    old_prot_prob_list.append([self.msg_log[node_in, node].tolist()])
-
+                prot_prob_list.append(self.msg[node_in, node])
+                old_prot_prob_list.append(self.msg_log[node_in, node])
                 prot_list.append(node_in)
             else:
                 peptides.append(node_in)
@@ -236,15 +229,15 @@ class Messages:
                     array_utils.avoid_underflow(shared_likelihoods), self.msg_log[node_in, node]
                 )
 
-        # TODO Tanja: what are you trying to compare here? Do you want to check if all values in these lists
-        # are different?
-        if all(old_shared_likelihoods != shared_likelihoods) and any(
-                [
-                    (prot_prob_list[i][0]) != (old_prot_prob_list[i][0])
+        # TODO: Tanja, does this need to be or / and?
+        if (
+                not np.array_equal(old_shared_likelihoods, shared_likelihoods) or
+                any(
+                    np.array_equal(prot_prob_list[i], old_prot_prob_list[i])
                     for i in range(len(prot_prob_list))
-                ]
+                )
         ):
-            # only update when the shared likelihoods or at least on of the protein messages has changed
+            # only update when the shared likelihoods or at least one of the protein messages has changed
             ct = ConvolutionTree(shared_likelihoods, prot_prob_list)
 
             for protein in range(len(prot_list)):

@@ -1,9 +1,11 @@
 {
     "include": [
-        "scripts/array_utils.py"
+        "scripts/array_utils.py",
+        "scripts/convolution_tree.py"
     ],
     "strict": [
-        "scripts/array_utils.py"
+        "scripts/array_utils.py",
+        "scripts/convolution_tree.py"
     ],
     "reportMissingTypeStubs": true,
     "reportMissingImports": true,
