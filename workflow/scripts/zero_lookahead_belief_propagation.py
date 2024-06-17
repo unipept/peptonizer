@@ -4,159 +4,13 @@ import numpy as np
 import math
 import json
 import pandas as pdi
+import array_utils
 
-from scipy.signal import fftconvolve
+from convolution_tree import *
 from factor_graph_generation import *
-from scipy.special import logsumexp
 from pqdict import pqdict
 
 import time
-
-
-def normalize(array):
-    return array / np.sum(array)
-
-
-# normalization of log probabilities
-def log_normalize(array):
-    try:
-        y = np.exp(array - logsumexp(array))
-
-    except FloatingPointError:
-        print(array)
-        y = np.exp(array - logsumexp(array))
-    return y
-
-
-def avoid_underflow(array):
-    array[array < 1e-30] = 1e-30
-    return array
-
-
-# implementation of the convolution tree according to serang
-# not written by me!!
-class CTNode:
-    def __init__(self, jointAbove):
-        # normalize for greater precision
-        self.jointAbove = normalize(jointAbove)
-
-        self.leftParent = None
-        self.rightParent = None
-
-        self.likelihoodBelow = None
-
-    # passing msges down: adding variables
-    @classmethod
-    def createCountNode(cls, lhs, rhs):
-        # create a count node with joint prob for two parents above(vs the init if we have no parents)
-        jointAbove = fftconvolve(lhs.jointAbove, rhs.jointAbove)
-        result = cls(jointAbove)
-
-        result.leftParent = lhs
-        result.rightParent = rhs
-
-        return result
-
-    # passing messages up : subtracting variables
-    def messageUp(self, answerSize, otherJointVector):
-        startingPoint = len(otherJointVector) - 1
-        result = fftconvolve(otherJointVector[::-1], self.likelihoodBelow)[
-                 startingPoint: startingPoint + answerSize
-                 ]
-
-        return normalize(result)
-
-    def messageUpLeft(self):
-        return self.messageUp(
-            len(self.leftParent.jointAbove[0]), self.rightParent.jointAbove[0]
-        )
-
-    def messageUpRight(self):
-        return self.messageUp(
-            len(self.rightParent.jointAbove[0]), self.leftParent.jointAbove[0]
-        )
-
-    # once all messages are received
-    def posterior(self):
-        return normalize(self.jointAbove * self.likelihoodBelow)
-
-    def MessagesUp(self):
-        return self.likelihoodBelow
-
-
-class ConvolutionTree:
-    def __init__(self, nToSharedLikelihoods, proteins):
-        self.nToSharedLikelihoods = nToSharedLikelihoods
-        self.logLength = int(math.ceil(np.log2(float(len(proteins)))))  # length we need
-        self.allLayers = []
-        self.buildFirstLayer(proteins)
-        self.buildRemainingLayers()
-        self.propagateBackward()
-        self.nProteins = len(proteins)
-
-    def buildFirstLayer(self, proteins):
-        # construct first layer (of proteins)
-        layer = []
-        for prot in proteins:
-            protNode = CTNode(prot)
-            layer.append(protNode)
-
-        # pad with necessarily absent dummy variables so that the
-        # number of variables is a power of 2; this is not the most
-        # efficient method for this. because they are absent, they won't influence the
-        # total sum, and thus Ds.
-        for i in range(0, 2 ** self.logLength - len(proteins)):
-            # this protein cannot be present, therefor set propbaility array to (0,1)
-            layer.append(CTNode([np.array([1, 0])]))  # TODO change this order
-
-        self.allLayers.append(layer)
-
-    def buildRemainingLayers(self):
-        # construct layers of count nodes
-        for L in range(self.logLength):
-            # print('layers needed: ',int(len(self.allLayers[0])/(2**(L+1))))
-            mostRecentLayer = self.allLayers[-1]
-            layer = []
-            for i in range(int(len(self.allLayers[0]) / (2 ** (L + 1)))):
-                leftParent = mostRecentLayer[i * 2]
-                rightParent = mostRecentLayer[i * 2 + 1]
-                countNode = CTNode.createCountNode(leftParent, rightParent)
-                layer.append(countNode)
-
-            # add connection to remaining nodes (when layer above is not a power of 2)
-            self.allLayers.append(layer)
-
-        # final node gets (Ds | N) multiplied into its likelihoodBelow
-        finalNode = self.allLayers[-1][0]
-        # normalize for greater precision
-        finalNode.likelihoodBelow = normalize(self.nToSharedLikelihoods)
-        self.LastNode = finalNode
-
-    def propagateBackward(self):
-        # propagate backward, setting likelihoodBelow.
-        # the loop has upper bound at logLength+1
-        # because of the layer of proteins
-        for L in range(1, self.logLength + 1)[::-1]:
-            layer = self.allLayers[L]
-
-            for i in range(len(layer)):
-                node = layer[i]
-                leftParent = node.leftParent
-                rightParent = node.rightParent
-
-                leftParent.likelihoodBelow = node.messageUpLeft()
-                rightParent.likelihoodBelow = node.messageUpRight()
-
-        self.proteinLayer = self.allLayers[0]
-
-    def posteriorForVariable(self, protInd):
-        return self.proteinLayer[protInd].posterior()
-
-    def MessageToVariable(self, protInd):
-        return self.proteinLayer[protInd].MessagesUp()
-
-    def MessageToSharedLikelihood(self):
-        return self.LastNode.jointAbove[0][0: (self.nProteins + 1)]
 
 
 class Messages:
@@ -273,7 +127,7 @@ class Messages:
             len(incoming_messages), 2
         )
 
-        out_message_log = log_normalize(
+        out_message_log = array_utils.log_normalize(
             np.asarray(
                 [
                     np.sum([np.log(node_belief[0]), np.sum(incoming_messages[:, 0])]),
@@ -309,7 +163,7 @@ class Messages:
             incoming_messages = np.asarray(incoming_messages).reshape(
                 len(incoming_messages), 2
             )  # np.asarray(np.log(IncomingMessages)).reshape(len(IncomingMessages),2)
-            out_messages = normalize(
+            out_messages = array_utils.normalize(
                 np.multiply(
                     node_belief,
                     [np.prod(incoming_messages[:, 0]), np.prod(incoming_messages[:, 1])],
@@ -327,7 +181,7 @@ class Messages:
                 # catch warning for log(0)
 
                 log_belief = np.log(node_belief)
-                out_messages_log = log_normalize(np.add(log_belief, incoming_messages_log))
+                out_messages_log = array_utils.log_normalize(np.add(log_belief, incoming_messages_log))
                 if not np.all(out_messages_log):
                     out_messages_log[out_messages_log == 0] = 1e-30
 
@@ -337,7 +191,7 @@ class Messages:
                 incoming_messages = np.asarray(incoming_messages).reshape(
                     len(incoming_messages), 2
                 )
-                out_messages = normalize(
+                out_messages = array_utils.normalize(
                     np.multiply(
                         node_belief,
                         [
@@ -374,12 +228,12 @@ class Messages:
                 peptides.append(node_in)
                 try:
                     shared_likelihoods = np.multiply(
-                        avoid_underflow(shared_likelihoods), self.msg[node_in, node]
+                        array_utils.avoid_underflow(shared_likelihoods), self.msg[node_in, node]
                     )
                 except:
                     print(shared_likelihoods, self.msg[node_in, node])
                 old_shared_likelihoods = np.multiply(
-                    avoid_underflow(shared_likelihoods), self.msg_log[node_in, node]
+                    array_utils.avoid_underflow(shared_likelihoods), self.msg_log[node_in, node]
                 )
 
         # TODO Tanja: what are you trying to compare here? Do you want to check if all values in these lists
@@ -394,14 +248,14 @@ class Messages:
             ct = ConvolutionTree(shared_likelihoods, prot_prob_list)
 
             for protein in range(len(prot_list)):
-                self.msg_new[node, prot_list[protein]] = ct.MessageToVariable(protein)
+                self.msg_new[node, prot_list[protein]] = ct.message_to_variable(protein)
                 if not np.all(self.msg_new[node, prot_list[protein]]):
                     self.msg_new[node, prot_list[protein]][
                         self.msg_new[node, prot_list[protein]] == 0
                         ] = 1e-30
 
             for pep in peptides:
-                self.msg_new[node, pep] = ct.MessageToSharedLikelihood()
+                self.msg_new[node, pep] = ct.message_to_shared_likelihood()
                 if not np.all(self.msg_new[node, pep]):
                     self.msg_new[node, pep][self.msg_new[node, pep] < 1e-30] = 1e-30
 
@@ -616,7 +470,7 @@ class Messages:
                 incoming_messages = np.asarray(np.log(incoming_messages)).reshape(
                     len(incoming_messages), 2
                 )
-                logged_variable_marginal = log_normalize(
+                logged_variable_marginal = array_utils.log_normalize(
                     np.asarray(
                         [
                             np.sum(

@@ -1,15 +1,9 @@
 import numpy as np
 import networkx as nx
-from collections import namedtuple
 import pandas as pd
+import array_utils
 
-def normalize(array):
-    return array / np.sum(array)
-
-
-def avoid_underflow(array):
-    array[array < 1e-30] = 1e-30
-    return array
+from collections import namedtuple
 
 
 class ProteinPeptideGraph(nx.Graph):
@@ -273,9 +267,9 @@ class CTFactorGraph(FactorGraph):
                 # check1 = cpdArray[0,:]
                 cpdArray[1, :] = np.add(-cpdArray[0, :], 1)
                 cpdArray_regularized[1, :] = np.add(-cpdArray_regularized[0, :], 1)
-                cpdArray = np.transpose(normalize(cpdArray))
-                cpdArray_regularized = avoid_underflow(
-                    np.transpose(normalize(cpdArray_regularized))
+                cpdArray = np.transpose(array_utils.normalize(cpdArray))
+                cpdArray_regularized = array_utils.avoid_underflow(
+                    np.transpose(array_utils.normalize(cpdArray_regularized))
                 )
                 if regularized == True:
                     FactorToAdd = Factor(
