@@ -77,12 +77,14 @@ class ConvolutionTree:
         self.n_to_shared_likelihoods: npt.NDArray[np.float64] = n_to_shared_likelihoods
         self.log_length: int = int(math.ceil(np.log2(float(len(proteins)))))  # length we need
         self.all_layers: List[List[CTNode]] = []
-        self.build_first_layer(proteins)
-        self.build_remaining_layers()
-        self.propagate_backward()
+
+        self._build_first_layer(proteins)
+        self._build_remaining_layers()
+        self._propagate_backward()
+
         self.n_proteins: int = len(proteins)
 
-    def build_first_layer(self, proteins: List[npt.NDArray[np.float64]]):
+    def _build_first_layer(self, proteins: List[npt.NDArray[np.float64]]):
         # construct first layer (of proteins)
         layer: List[CTNode] = []
         for prot in proteins:
@@ -99,7 +101,7 @@ class ConvolutionTree:
 
         self.all_layers.append(layer)
 
-    def build_remaining_layers(self):
+    def _build_remaining_layers(self):
         # construct layers of count nodes
         for L in range(self.log_length):
             # print('layers needed: ',int(len(self.allLayers[0])/(2**(L+1))))
@@ -120,7 +122,7 @@ class ConvolutionTree:
         final_node.likelihood_below = array_utils.normalize(self.n_to_shared_likelihoods)
         self.last_node = final_node
 
-    def propagate_backward(self):
+    def _propagate_backward(self):
         # propagate backward, setting likelihoodBelow.
         # the loop has upper bound at logLength+1
         # because of the layer of proteins
