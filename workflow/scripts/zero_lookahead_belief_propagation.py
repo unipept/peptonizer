@@ -231,7 +231,7 @@ class Messages:
 
         # TODO: Tanja, does this need to be or / and?
         if (
-                not np.array_equal(old_shared_likelihoods, shared_likelihoods) or
+                np.all(old_shared_likelihoods != shared_likelihoods) and
                 any(
                     np.array_equal(prot_prob_list[i], old_prot_prob_list[i])
                     for i in range(len(prot_prob_list))

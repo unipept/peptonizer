@@ -34,7 +34,7 @@ class CTNode:
 
     # passing messages up : subtracting variables
     def message_up(self, answer_size: int, other_joint_vector: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        assert self.likelihood_below
+        assert self.likelihood_below is not None
 
         starting_point = len(other_joint_vector) - 1
         result = fftconvolve(
@@ -44,16 +44,16 @@ class CTNode:
         return array_utils.normalize(result)
 
     def message_up_left(self) -> npt.NDArray[np.float64]:
-        assert self.left_parent and self.left_parent.joint_above
-        assert self.right_parent and self.right_parent.joint_above
+        assert self.left_parent and self.left_parent.joint_above is not None
+        assert self.right_parent and self.right_parent.joint_above is not None
 
         return self.message_up(
             len(self.left_parent.joint_above), self.right_parent.joint_above
         )
 
     def message_up_right(self) -> npt.NDArray[np.float64]:
-        assert self.left_parent and self.left_parent.joint_above
-        assert self.right_parent and self.right_parent.joint_above
+        assert self.left_parent and self.left_parent.joint_above is not None
+        assert self.right_parent and self.right_parent.joint_above is not None
 
         return self.message_up(
             len(self.right_parent.joint_above), self.left_parent.joint_above
@@ -61,13 +61,13 @@ class CTNode:
 
     # once all messages are received
     def posterior(self) -> npt.NDArray[np.float64]:
-        assert self.joint_above
-        assert self.likelihood_below
+        assert self.joint_above is not None
+        assert self.likelihood_below is not None
 
         return array_utils.normalize(self.joint_above * self.likelihood_below)
 
     def messages_up(self) -> npt.NDArray[np.float64]:
-        assert self.likelihood_below
+        assert self.likelihood_below is not None
 
         return self.likelihood_below
 
@@ -77,6 +77,8 @@ class ConvolutionTree:
         self.n_to_shared_likelihoods: npt.NDArray[np.float64] = n_to_shared_likelihoods
         self.log_length: int = int(math.ceil(np.log2(float(len(proteins)))))  # length we need
         self.all_layers: List[List[CTNode]] = []
+        self.last_node: Optional[CTNode] = None
+        self.protein_layer: List[CTNode] = []
 
         self._build_first_layer(proteins)
         self._build_remaining_layers()
@@ -150,4 +152,6 @@ class ConvolutionTree:
         return self.protein_layer[prot_idx].messages_up()
 
     def message_to_shared_likelihood(self) -> npt.NDArray[np.float64]:
+        assert self.last_node
+
         return self.last_node.joint_above[0: (self.n_proteins + 1)]
