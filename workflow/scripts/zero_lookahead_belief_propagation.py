@@ -1,16 +1,13 @@
 # implementation of belief propagation on a peptide-protein graph
 # __________________________________________________________________________________________
+import time
+import numpy.typing as npt
 import numpy as np
-import math
-import json
-import pandas as pdi
-import array_utils
 
 from convolution_tree import *
 from factor_graph_generation import *
 from pqdict import pqdict
-
-import time
+from typing import Set, Dict, Any, List, Tuple, Iterator
 
 
 class Messages:
@@ -20,42 +17,44 @@ class Messages:
     """
 
     # class that holds the messages of iteration t and iteration t+1 as dictionaries
-
-    def __init__(self, ct_graph_in):
+    def __init__(self, ct_graph_in: CTFactorGraph):
         # TODO check if I truly need all three of msg new, msglog and msg.
-        self.list_of_cts = set()
-        self.graph = ct_graph_in
-        self.max_val = None
-        self.priorities = pqdict({}, reverse=True)
-        self.category = ct_graph_in.category
+        # A list of the IDs of the convolution tree's that have already been checked
+        self.list_of_cts: Set[int] = set()
+        self.graph: CTFactorGraph = ct_graph_in
+        self.max_val: Optional[Tuple[int, int]] = None
+        self.priorities: pqdict = pqdict({}, reverse=True)
+        self.category: str = ct_graph_in.category
 
         # Maps a node identifier (as specified by the CTGraph) onto a unique integer.
-        self.node_descriptions = {}
+        self.node_descriptions: Dict[str, int] = {}
         # Reverse mapping of the dict above
-        self.node_id_to_description = []
+        self.node_id_to_description: List[str] = []
         # Maps a node ID onto its category
-        self.categories = []
+        self.categories: List[str] = []
         # Maps a node ID onto a list of its neighbouring node IDs
-        self.neighbours = []
+        self.neighbours: List[List[int]] = []
         # Keeps track of the number of parents of a node
-        self.number_of_parents = []
+        self.number_of_parents: List[int] = []
         # Keeps track of node IDs that are of the CPD type
-        self.cpds = set()
+        self.cpds: Set[int] = set()
         # Keep track of all edges (with node IDs)
-        self.edges = []
+        self.edges: List[Tuple[int, int]] = []
 
         # Keeps track of residuals for edges in the graph
-        self.full_residuals = {}
-        self.total_residuals = {}
+        self.full_residuals: Dict[Tuple[int, int], float] = {}
+        self.total_residuals: Dict[Tuple[Tuple[int, int], Tuple[int, int]], float] = {}
 
-        self.initial_beliefs = []
-        self.current_beliefs = []
+        self.initial_beliefs: List[npt.NDArray[np.float64]] = []
+        self.current_beliefs: List[npt.NDArray[np.float64]] = []
 
-        self.msg = {}
-        self.msg_new = {}
-        self.msg_log = {}
+        self.msg: Dict[Tuple[int, int], npt.NDArray[np.float64]] = {}
+        self.msg_new: Dict[Tuple[int, int], npt.NDArray[np.float64]] = {}
+        self.msg_log: Dict[Tuple[int, int], npt.NDArray[np.float64]] = {}
 
-        for (node_id, node) in enumerate(ct_graph_in.nodes(data=True)):
+        nodes: Iterator[Tuple[Any, Dict[str, Any]]] = ct_graph_in.nodes(data=True)
+
+        for (node_id, node) in enumerate(nodes):
             # Each node should occur exactly once
             assert node[0] not in self.node_descriptions
 
@@ -67,7 +66,7 @@ class Messages:
             if node[1]["category"] == "Convolution Tree":
                 self.number_of_parents.append(node[1]["NumberOfParents"])
             else:
-                self.number_of_parents.append(None)
+                self.number_of_parents.append(0)
 
             if "CPD" in str(node[0]):
                 self.cpds.add(node_id)
@@ -106,12 +105,13 @@ class Messages:
         self.msg_log = self.msg_new.copy()
 
     # variables (peptides,proteins,taxa)
-    def get_incoming_message_variable(self, node, node_in):
+    def get_incoming_message_variable(self, node: int, node_in: int) -> npt.NDArray[np.float64]:
         return self.msg[node, node_in]
 
-    def compute_out_message_variable(self, node_out, node_in):
-        incoming_messages = []
-        node_belief = self.current_beliefs[node_out]
+    def compute_out_message_variable(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
+        incoming_messages: List[npt.NDArray[np.float64]] = []
+        node_belief: npt.NDArray[np.float64] = self.current_beliefs[node_out]
+
         for node_out_neighbor in self.neighbours[node_out]:
             if node_out_neighbor != node_in:
                 incoming_messages.append(
@@ -123,15 +123,15 @@ class Messages:
             return node_belief if any(node_belief == self.initial_beliefs[node_out]) else self.msg[node_out, node_in]
 
         # need for logs to prevent underflow in very large multiplications
-        incoming_messages = np.asarray(np.log(incoming_messages)).reshape(
+        incoming_messages_array = np.asarray(np.log(incoming_messages)).reshape(
             len(incoming_messages), 2
         )
 
         out_message_log = array_utils.log_normalize(
             np.asarray(
                 [
-                    np.sum([np.log(node_belief[0]), np.sum(incoming_messages[:, 0])]),
-                    np.sum([np.log(node_belief[1]), np.sum(incoming_messages[:, 1])]),
+                    np.sum([np.log(node_belief[0]), np.sum(incoming_messages_array[:, 0])]),
+                    np.sum([np.log(node_belief[1]), np.sum(incoming_messages_array[:, 1])]),
                 ]
             )
         )
@@ -142,11 +142,11 @@ class Messages:
         return out_message_log
 
     # factors (Conditional probability tables), handles different dimension of output/input variables
-    def get_incoming_message_factor(self, node, node_in):
+    def get_incoming_message_factor(self, node: int, node_in: int) -> npt.NDArray[np.float64]:
         return self.msg[node, node_in]
 
-    def compute_out_message_factor(self, node_out, node_in):
-        incoming_messages = []
+    def compute_out_message_factor(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
+        incoming_messages: List[npt.NDArray[np.float64]] = []
         node_belief = self.current_beliefs[node_out]
 
         for node_out_neighbour in self.neighbours[node_out]:
@@ -159,14 +159,14 @@ class Messages:
 
         if self.categories[node_in] == "Convolution Tree":
             # handles empty & messages with only one value
-            incoming_messages.append([1.0, 1.0])
-            incoming_messages = np.asarray(incoming_messages).reshape(
+            incoming_messages.append(np.asarray([1.0, 1.0]))
+            in_messages_array: npt.NDArray[np.float64] = np.asarray(incoming_messages).reshape(
                 len(incoming_messages), 2
             )  # np.asarray(np.log(IncomingMessages)).reshape(len(IncomingMessages),2)
             out_messages = array_utils.normalize(
                 np.multiply(
                     node_belief,
-                    [np.prod(incoming_messages[:, 0]), np.prod(incoming_messages[:, 1])],
+                    [np.prod(in_messages_array[:, 0]), np.prod(in_messages_array[:, 1])],
                 )
             )  # lognormalize(np.add(np.log(NodeBelief),[np.sum(IncomingMessages[:,0]),np.sum(IncomingMessages[:,1])]))#
 
@@ -185,32 +185,32 @@ class Messages:
                 if not np.all(out_messages_log):
                     out_messages_log[out_messages_log == 0] = 1e-30
 
-                return [np.sum(out_messages_log[0, :]), np.sum(out_messages_log[1, :])]
+                return np.asarray([np.sum(out_messages_log[0, :]), np.sum(out_messages_log[1, :])])
             else:
-                incoming_messages.append([1.0, 1.0])
-                incoming_messages = np.asarray(incoming_messages).reshape(
+                incoming_messages.append(np.asarray([1.0, 1.0]))
+                incoming_messages_array = np.asarray(incoming_messages).reshape(
                     len(incoming_messages), 2
                 )
                 out_messages = array_utils.normalize(
                     np.multiply(
                         node_belief,
                         [
-                            np.prod(incoming_messages[:, 0]),
-                            np.prod(incoming_messages[:, 1]),
+                            np.prod(incoming_messages_array[:, 0]),
+                            np.prod(incoming_messages_array[:, 1]),
                         ],
                     )
                 )
-                return [np.sum(out_messages[0, :]), np.sum(out_messages[1, :])]
+                return np.asarray([np.sum(out_messages[0, :]), np.sum(out_messages[1, :])])
 
                 # CTree, computes all out messages in one go
 
-    def compute_out_messages_ct_tree(self, node):
-        prot_prob_list = []
-        old_prot_prob_list = []
-        shared_likelihoods = np.ones(self.number_of_parents[node] + 1)
-        old_shared_likelihoods = None
-        peptides = []
-        prot_list = []
+    def compute_out_messages_ct_tree(self, node: int):
+        prot_prob_list: List[npt.NDArray[np.float64]] = []
+        old_prot_prob_list: List[npt.NDArray[np.float64]] = []
+        shared_likelihoods: npt.NDArray[np.float64] = np.ones(self.number_of_parents[node] + 1)
+        old_shared_likelihoods: npt.NDArray[np.float64] = np.empty(1)
+        peptides: List[int] = []
+        prot_list: List[int] = []
 
         for node_in in self.neighbours[node]:
             if node_in not in self.cpds:
@@ -231,9 +231,9 @@ class Messages:
 
         # TODO: Tanja, does this need to be or / and?
         if (
-                np.all(old_shared_likelihoods != shared_likelihoods) and
+                all(old_shared_likelihoods != shared_likelihoods) and
                 any(
-                    np.array_equal(prot_prob_list[i], old_prot_prob_list[i])
+                    prot_prob_list[i][0] != old_prot_prob_list[i][0]
                     for i in range(len(prot_prob_list))
                 )
         ):
@@ -260,14 +260,14 @@ class Messages:
                 self.msg_new[node, pep] = self.msg[node, pep]
 
     # keeps track of which CTs have been update already in the current computeUpdate() loop
-    def ct_update_check(self, ct):
-        if ct in self.list_of_cts:
+    def ct_update_check(self, ct_node_id: int) -> bool:
+        if ct_node_id in self.list_of_cts:
             return False
         else:
-            self.list_of_cts.add(ct)
+            self.list_of_cts.add(ct_node_id)
             return True
 
-    def compute_infinity_norm_residual(self, start_node, end_node):
+    def compute_infinity_norm_residual(self, start_node: int, end_node: int) -> float:
         msg1 = self.msg[start_node, end_node]
         msg2 = self.msg_log[start_node, end_node]
 
@@ -283,14 +283,14 @@ class Messages:
         return np.max(np.abs(np.log(np.divide(msg1, msg2))))
         # approximate residual with zero look-ahead
 
-    def compute_zero_look_ahead_residual(self, start_node, end_node):
+    def compute_zero_look_ahead_residual(self, start_node: int, end_node: int) -> float:
         node_in_neighbours = [nodes for nodes in self.neighbours[start_node]]
         node_in_neighbours.remove(end_node)
         return sum(
             [self.full_residuals[(neighbour, start_node)] for neighbour in node_in_neighbours]
         )
 
-    def compute_total_residuals(self, start_node, end_node, current_residual):
+    def compute_total_residuals(self, start_node: int, end_node: int, current_residual: float):
         for start_neighbour in self.neighbours[start_node]:
             if start_neighbour != end_node:
                 self.total_residuals[
@@ -303,8 +303,8 @@ class Messages:
                     self.total_residuals[((start_node, end_node), (end_node, end_neighbour))] + current_residual
                 )
 
-    def compute_priority(self, start_node, end_node):
-        self.priorities[(start_node, end_node)] = 0
+    def compute_priority(self, start_node: int, end_node: int):
+        self.priorities[start_node, end_node] = 0
 
         for end_neighbor in self.neighbours[end_node]:
             if end_neighbor != start_node:
@@ -317,7 +317,7 @@ class Messages:
                 )
 
     # computes new message for a given edge (startname, endname) in the direction startname -> endname
-    def single_edge_direction_update(self, start_node, end_node):
+    def single_edge_direction_update(self, start_node: int, end_node: int):
         if (
                 self.categories[start_node] == self.category
                 or self.categories[start_node] == "peptide"
@@ -335,7 +335,7 @@ class Messages:
             )
 
     # compute updated messages for all edges
-    def compute_update(self, local_loops=False):
+    def compute_update(self, local_loops: bool = False):
         self.list_of_cts = set()  # keeps track of which CT has already been active
 
         assert isinstance(local_loops, bool), "local_loops needs to be boolean"
@@ -348,27 +348,20 @@ class Messages:
         else:
             for edge in self.edges:
                 # update all edges
-                start_node, end_node = edge[0], edge[1]
+                start_node: int = edge[0]
+                end_node: int = edge[1]
+
                 self.single_edge_direction_update(start_node, end_node)
 
-                start_node, end_node = edge[1], edge[0]
+                start_node: int = edge[1]
+                end_node: int = edge[0]
                 self.single_edge_direction_update(start_node, end_node)
 
-    def update_residual_message(self, residual):
-        """
-        check which message residual has the largest residual and updates that message in self.msg
-        :param residual: dict, residuals of the last belief propagation iteration
-        """
-
-        self.max_val = max(residual, key=residual.get)
-        self.msg[self.max_val] = self.msg_new[self.max_val]
-        return residual[self.max_val]
-
-    def get_priority_message(self, priority_vector):
+    def get_priority_message(self, priority_vector: pqdict) -> Tuple[int, int]:
         self.max_val = priority_vector.top()
         return self.max_val
 
-    def zero_look_ahead_loopy_loop(self, max_loops, tolerance, local=False):
+    def zero_look_ahead_loopy_loop(self, max_loops: int, tolerance: float, local: bool = False) -> Dict[str, npt.NDArray[np.float64]]:
         """
         Run the zero-look-ahead belief propagation algorithm.
         :param max_loops: int, maximum number of iterations in case of non-convergence
@@ -452,7 +445,7 @@ class Messages:
                     node_category == self.category
                     or node_category == "peptide"
             ):
-                incoming_messages = []
+                incoming_messages: List[npt.NDArray[np.float64]] = []
 
                 for variable_neighbour in self.neighbours[node_id]:
                     incoming_messages.append(
@@ -460,7 +453,7 @@ class Messages:
                     )
 
                 # log to avoid overflow
-                incoming_messages = np.asarray(np.log(incoming_messages)).reshape(
+                incoming_messages_array = np.asarray(np.log(incoming_messages)).reshape(
                     len(incoming_messages), 2
                 )
                 logged_variable_marginal = array_utils.log_normalize(
@@ -469,13 +462,13 @@ class Messages:
                             np.sum(
                                 [
                                     np.log(self.initial_beliefs[node_id][0]),
-                                    np.sum(incoming_messages[:, 0]),
+                                    np.sum(incoming_messages_array[:, 0]),
                                 ]
                             ),
                             np.sum(
                                 [
                                     np.log(self.initial_beliefs[node_id][1]),
-                                    np.sum(incoming_messages[:, 1]),
+                                    np.sum(incoming_messages_array[:, 1]),
                                 ]
                             ),
                         ]
@@ -485,14 +478,14 @@ class Messages:
                 self.current_beliefs[node_id] = logged_variable_marginal
 
         # Translate the node_ids back to their original sequences and return the current beliefs as a dictionary
-        output_beliefs = {}
+        output_beliefs: Dict[str, npt.NDArray[np.float64]] = {}
         for (node_id, beliefs) in enumerate(self.current_beliefs):
             output_beliefs[self.node_id_to_description[node_id]] = beliefs
         return output_beliefs
 
 
 # calibration through message passing of all subgraphs in the List of factor graphs
-def calibrate_all_subgraphs(list_of_ct_factor_graphs, max_iterations, tolerance, local=False):
+def calibrate_all_subgraphs(list_of_ct_factor_graphs: List[CTFactorGraph], max_iterations: int, tolerance: float, local: bool = False) -> Tuple[Dict[str, npt.NDArray[np.float64]], Dict[str, str]]:
     """
     Performs bayesian inference through loopy belief propagation, returns dictionary {variable:posterior_probability}
     :param list_of_ct_factor_graphs: list, contains FactorGraph objects on which inference can be performed
@@ -501,27 +494,22 @@ def calibrate_all_subgraphs(list_of_ct_factor_graphs, max_iterations, tolerance,
     :param local: Bool, whether loops are calculated locally
     """
 
-    if not isinstance(list_of_ct_factor_graphs, list):
-        raise TypeError("ListOfFactorGraphs needs to be a list of graphs")
-    if not isinstance(local, bool):
-        raise TypeError("localloops needs to be boolean")
-
-    results_dict = {}
-    node_dict = {}
+    results_dict: Dict[str, npt.NDArray[np.float64]] = {}
+    node_category_dict: Dict[str, str] = {}
 
     for (idx, graph) in enumerate(list_of_ct_factor_graphs):
         print(f"Started calibrating graph {idx + 1} of {len(list_of_ct_factor_graphs)}")
         if graph.number_of_nodes() > 2:
-            node_dict.update(dict(graph.nodes(data="category")))
+            node_category_dict.update(dict(graph.nodes(data="category")))
             initialized_message_object = Messages(graph)
             current_beliefs = initialized_message_object.zero_look_ahead_loopy_loop(
                 max_iterations, tolerance, local
             )
             results_dict.update(current_beliefs)
-    return results_dict, node_dict
+    return results_dict, node_category_dict
 
 
-def save_results_to_csv(results_dict, node_dict, name_string):
+def save_results_to_csv(results_dict: Dict[str, npt.NDArray[np.float64]], node_dict: Dict[str, str], name_string: str):
     """
     Save Loopy Belief Propagation results to .csv file
     :param results_dict: dict, {variable:posterior_probability}
@@ -529,16 +517,10 @@ def save_results_to_csv(results_dict, node_dict, name_string):
     :param name_string: str, csv output path
     """
 
-    if not isinstance(name_string, str):
-        raise TypeError("name_string needs to a string with Info on your run")
-    if not isinstance(results_dict, dict):
-        raise TypeError("results_dict must be dictionary")
-    if not isinstance(node_dict, dict):
-        raise TypeError("node_dict must be dictionary")
-
     full_results_dict = {
         key: [results_dict[key][1], node_dict[key]] for key in results_dict.keys()
     }
+
     pd.DataFrame.from_dict(data=full_results_dict, orient="index").to_csv(
         name_string, header=False
     )  # (datetime.now().strftime("%Y-%-m-%d-%H-%M-%S")+'-' +NameString + '-Results.csv', header = False)
