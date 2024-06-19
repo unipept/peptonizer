@@ -21,8 +21,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 taxon_graph = TaxonGraph()
-taxon_graph.CreateFromUnipeptResponseCSV(args.graph_data_frame)
+taxon_graph.create_from_unipept_response_csv(args.graph_data_frame)
 factor_graph = FactorGraph()
-factor_graph.ConstructFromTaxonGraph(taxon_graph)
-ct_factor_graph = GenerateCTFactorGraphs(factor_graph)
-ct_factor_graph.SaveToGraphML(args.out)
+factor_graph.construct_from_existing_graph(taxon_graph)
+ct_factor_graph = generate_ct_factor_graphs(factor_graph)
+ct_factor_graph.save_to_graph_ml(args.out)

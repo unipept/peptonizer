@@ -72,7 +72,7 @@ class Messages:
                 self.cpds.add(node_id)
 
             if node[1]["category"] == "factor":
-                self.initial_beliefs.append(node[1]["InitialBelief"].Factor.array)
+                self.initial_beliefs.append(node[1]["InitialBelief"].factor.array)
             elif node[1]["category"] == "peptide" or node[1]["category"] == ct_graph_in.category:
                 self.initial_beliefs.append(np.array([node[1]["InitialBelief_0"], node[1]["InitialBelief_1"]]))
             else:

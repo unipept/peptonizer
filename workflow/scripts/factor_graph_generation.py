@@ -19,17 +19,17 @@ class TaxonGraph(nx.Graph):
 
     def __init__(self):
         nx.Graph.__init__(self)
-        self.TaxidList = []
+        self.taxon_id_list = []
 
-    def CreateFromUnipeptResponseCSV(self, CSVpath):
-        UnipeptResponse = pd.read_csv(CSVpath)
+    def create_from_unipept_response_csv(self, csv_path):
+        unipept_response = pd.read_csv(csv_path)
         # drop rows that have an entry in Highertaxa that appears only once
-        counts = UnipeptResponse["HigherTaxa"].value_counts()
-        UnipeptResponse = UnipeptResponse[
-            UnipeptResponse["HigherTaxa"].isin(counts[counts > 1].index)
+        counts = unipept_response["HigherTaxa"].value_counts()
+        unipept_response = unipept_response[
+            unipept_response["HigherTaxa"].isin(counts[counts > 1].index)
         ]
-        newGraph = nx.from_pandas_edgelist(UnipeptResponse, "sequence", "HigherTaxa")
-        PeptideAttributes = UnipeptResponse.apply(
+        new_graph = nx.from_pandas_edgelist(unipept_response, "sequence", "HigherTaxa")
+        peptide_attributes = unipept_response.apply(
             lambda row: (
                 row["sequence"],
                 {
@@ -40,43 +40,30 @@ class TaxonGraph(nx.Graph):
             ),
             axis=1,
         )
-        TaxaAttributes = UnipeptResponse.apply(
+        taxa_attributes = unipept_response.apply(
             lambda row: (row["HigherTaxa"], {"category": "taxon"}), axis=1
         )
-        IntermediateGraph = nx.Graph()
-        IntermediateGraph.add_edges_from(newGraph.edges)
-        IntermediateGraph.add_nodes_from(PeptideAttributes)
-        IntermediateGraph.add_nodes_from(TaxaAttributes)
+        intermediate_graph = nx.Graph()
+        intermediate_graph.add_edges_from(new_graph.edges)
+        intermediate_graph.add_nodes_from(peptide_attributes)
+        intermediate_graph.add_nodes_from(taxa_attributes)
 
         # cluster the resulting graph with the louvain algorithm
-        communities = nx.community.louvain_communities(IntermediateGraph)
+        communities = nx.community.louvain_communities(intermediate_graph)
         # separate the graph into its communities and enter into same graph object
         for i, community in enumerate(communities):
-            Subgraph = IntermediateGraph.subgraph(community)
-            self.add_edges_from(Subgraph.edges)
+            subgraph = intermediate_graph.subgraph(community)
+            self.add_edges_from(subgraph.edges)
 
-        self.add_nodes_from(PeptideAttributes)
-        self.add_nodes_from(TaxaAttributes)
+        self.add_nodes_from(peptide_attributes)
+        self.add_nodes_from(taxa_attributes)
 
 
 class Factor:
     # represents noisy OR cpds, has dimension n(parensports)xn(peptide states(=2))
-    def __init__(self, CPDarray, VariableArray):
-        if isinstance(VariableArray, str):
-            raise TypeError(
-                "VariableArray: Expected type list or array like, got string"
-            )
-
+    def __init__(self, cpd_array, variable_array):
         Factor = namedtuple("Factor", ["array", "arrayLabels"])
-        self.Factor = Factor(CPDarray, VariableArray)
-
-
-class Variable:
-    # has dimension of petide states ergo 2
-    def __init__(self, ProbabilityArray, VariableArray):
-        self.Variable = namedtuple("Variable", ["array", "arrayLabels"])
-        Variable.array = ProbabilityArray
-        Variable.arrayLabels = VariableArray
+        self.factor = Factor(cpd_array, variable_array)
 
 
 # the variable and factor types might be unecessary as i do not need a lot of flexibility in the input
@@ -88,59 +75,39 @@ class FactorGraph(nx.Graph):
     def __init__(self):
         super().__init__()
 
-    def ConstructFromProteinPeptideGraph(self, ProteinPeptideGraph):
-        """'
-        Takes a graph of proteins to peptides as input and adds the noisy-OR factors
-        """
-        nodelist = list(ProteinPeptideGraph.nodes(data=True))
-        self.add_nodes_from(nodelist)
-        for node in nodelist:
+    def construct_from_existing_graph(self, graph_data: nx.Graph):
+        node_list = list(graph_data.nodes(data=True))
+        self.add_nodes_from(node_list)
+        for node in node_list:
             # create noisy OR cpd per peptide
             if node[1]["category"] == "peptide":
-                degree = ProteinPeptideGraph.degree(node[0])
-                neighbors = list(ProteinPeptideGraph.neighbors(node[0]))
-                self.add_node(node[0] + " CPD", category="factor", ParentNumber=degree)
-                self.add_edges_from([(node[0] + " CPD", x) for x in neighbors])
-                self.add_edge(node[0] + " CPD", node[0])
-
-        return [self]
-
-    def ConstructFromTaxonGraph(self, TaxonPeptideGraph):
-        """'
-        Takes a graph of Taxa to peptides in networkx form as input and adds the factor nodes
-        """
-        nodelist = list(TaxonPeptideGraph.nodes(data=True))
-        self.add_nodes_from(nodelist)
-        for node in nodelist:
-            # create noisy OR cpd per peptide
-            if node[1]["category"] == "peptide":
-                degree = TaxonPeptideGraph.degree(node[0])
-                neighbors = list(TaxonPeptideGraph.neighbors(node[0]))
+                degree = graph_data.degree(node[0])
+                neighbors = list(graph_data.neighbors(node[0]))
                 self.add_node(node[0] + " CPD", category="factor", ParentNumber=degree)
                 self.add_edges_from([(node[0] + " CPD", x) for x in neighbors])
                 self.add_edge(node[0] + " CPD", node[0])
 
 
 # separate the connected components in the subgraph
-def SeparateSubgraphs(graphIN, NodesToKeep):
+def separate_subgraphs(graph_in, nodes_to_keep):
     """
     separations of subgraphs (create news graphs for each subgraph)
 
     """
-    newG = CTFactorGraph(nx.Graph())
+    new_graph = CTFactorGraph(nx.Graph())
 
     # add nodes to keep
-    newG.add_nodes_from((n, graphIN.nodes[n]) for n in NodesToKeep)
+    new_graph.add_nodes_from((n, graph_in.nodes[n]) for n in nodes_to_keep)
     # add edges if they are present in original graph
-    newG.add_edges_from(
+    new_graph.add_edges_from(
         (n, nbr, d)
-        for n, nbrs in graphIN.adj.items()
-        if n in NodesToKeep
+        for n, nbrs in graph_in.adj.items()
+        if n in nodes_to_keep
         for nbr, d in nbrs.items()
-        if nbr in NodesToKeep
+        if nbr in nodes_to_keep
     )
 
-    return newG  # ListOfFactorGraphs
+    return new_graph  # ListOfFactorGraphs
 
 
 class CTFactorGraph(FactorGraph):
@@ -148,102 +115,103 @@ class CTFactorGraph(FactorGraph):
     This class is a networkx graph representing the full graphical model with all variables, CTrees, and Noisy-OR factors
     """
 
-    def __init__(self, GraphIn, GraphType="Taxons"):
+    def __init__(self, graph_in, graph_type="Taxons"):
         """
         takes either a graph or a path to a graphML file as input
 
         """
         super().__init__()
 
-        GraphTypes = ["Proteins", "Taxons"]
-        if GraphType not in GraphTypes:
-            raise ValueError("Invalid Graphtype. Expected one of: %s" % GraphTypes)
+        graph_types = ["Proteins", "Taxons"]
+        if graph_type not in graph_types:
+            raise ValueError("Invalid Graphtype. Expected one of: %s" % graph_types)
 
-        if GraphType == "Taxons":
+        if graph_type == "Taxons":
             self.category = "taxon"
-        elif GraphType == "Protein":
+        elif graph_type == "Protein":
             self.category = "protein"
 
-        if isinstance(GraphIn, str):
-            GraphIn = nx.read_graphml(GraphIn)
+        if isinstance(graph_in, str):
+            graph_in = nx.read_graphml(graph_in)
 
         # need these to create a new instance of a CT fractorgraph and not overwrite the previous graph
-        self.add_edges_from(GraphIn.edges(data=True))
-        self.add_nodes_from(GraphIn.nodes(data=True))
+        self.add_edges_from(graph_in.edges(data=True))
+        self.add_nodes_from(graph_in.nodes(data=True))
 
-    def AddCTNodes(self):
+    def add_ct_nodes(self):
         """
         When creating the CTGraph and not just reading from a previously saved graph format, use this command to add the CT nodes
         """
         # create the convolution tree nodes and connect them in the graph
-        ListOfEdgeAddList = []
-        ListOfEdgeRemoveList = []
-        ListOfProtLists = []
-        ListOfCTs = []
-        ListOfFactors = []
+        list_of_edge_add_list = []
+        list_of_edge_remove_list = []
+        list_of_prot_lists = []
+        list_of_cts = []
+        list_of_factors = []
         for node in self.nodes(data=True):
             # go through all factors with degree>2 and get their protein lists, then generate their conv. trees
             if node[1]["category"] == "factor" and self.degree[node[0]] > 2:
-                ProtList = []
+                prot_list = []
 
-                for neighbor in self.neighbors(node[0]):
-                    neighbornode = self.nodes[neighbor]
-                    if neighbornode["category"] == self.category:
-                        ProtList.append(neighbor)
+                for neighbour in self.neighbors(node[0]):
+                    neighbour_node = self.nodes[neighbour]
+                    if neighbour_node["category"] == self.category:
+                        prot_list.append(neighbour)
 
-                ListOfCTs.append([1])
-                ListOfFactors.append(node[0])
-                ListOfProtLists.append(ProtList)
-                ListOfEdgeAddList.append(
-                    [("CTree " + " ".join(str(ProtList)), x) for x in ProtList]
+                list_of_cts.append([1])
+                list_of_factors.append(node[0])
+                list_of_prot_lists.append(prot_list)
+                list_of_edge_add_list.append(
+                    [("CTree " + " ".join(str(prot_list)), x) for x in prot_list]
                 )
-                ListOfEdgeRemoveList.append([(node[0], x) for x in ProtList])
+                list_of_edge_remove_list.append([(node[0], x) for x in prot_list])
 
-        # Fill all info into graph structure, should probably do this inside the loop before, so that i can initialize the messages
-        for i in range(len(ListOfCTs)):
+        # Fill all info into graph structure, should probably do this inside the loop before, so that i can initialize
+        # the messages
+        for i in range(len(list_of_cts)):
             self.add_node(
-                "CTree " + " ".join(str(ListOfProtLists[i])),
-                ConvolutionTree=str(ListOfCTs[i][0]),
+                "CTree " + " ".join(str(list_of_prot_lists[i])),
+                ConvolutionTree=str(list_of_cts[i][0]),
                 category="Convolution Tree",
-                NumberOfParents=len(ListOfProtLists[i]),
+                NumberOfParents=len(list_of_prot_lists[i]),
             )
             self.add_edge(
-                "CTree " + " ".join(str(ListOfProtLists[i])),
-                ListOfFactors[i],
-                MessageLength=len(ListOfProtLists[i]) + 1,
+                "CTree " + " ".join(str(list_of_prot_lists[i])),
+                list_of_factors[i],
+                MessageLength=len(list_of_prot_lists[i]) + 1,
             )
-            self.add_edges_from(ListOfEdgeAddList[i])
-            self.remove_edges_from(ListOfEdgeRemoveList[i])
+            self.add_edges_from(list_of_edge_add_list[i])
+            self.remove_edges_from(list_of_edge_remove_list[i])
 
-    def SaveToGraphML(self, Filename):
-        nx.write_graphml(self, Filename)
+    def save_to_graph_ml(self, filename):
+        nx.write_graphml(self, filename)
 
-    def ComputeNetworkAttributes(self):
+    def compute_network_attributes(self):
         """
         Computes nodes attributes using builtin networkx functions
         Returns degree centrality, closeness centrality, betweenness centrality and eigen centrality
         """
-        DegreeCentrality = dict(
+        degree_centrality = dict(
             sorted(nx.degree_centrality(self).items(), key=lambda item: item[1])
         )
-        Closenesscentrality = dict(
+        closeness_centrality = dict(
             sorted(nx.closeness_centrality(self).items(), key=lambda item: item[1])
         )
-        BetweennessCentrality = dict(
+        betweenness_centrality = dict(
             nx.betweenness_centrality(self).items(), key=lambda item: item[1]
         )
-        Eigencentrality = dict(
+        eigen_centrality = dict(
             nx.eigenvector_centrality(self).items(), key=lambda item: item[1]
         )
 
         return (
-            DegreeCentrality,
-            Closenesscentrality,
-            BetweennessCentrality,
-            Eigencentrality,
+            degree_centrality,
+            closeness_centrality,
+            betweenness_centrality,
+            eigen_centrality,
         )
 
-    def FillInFactors(self, alpha, beta, regularized):
+    def fill_in_factors(self, alpha, beta, regularized):
         """fills in the noisy or Factors according to detection and error probabilities given"""
 
         for node in self.nodes(data=True):
@@ -252,40 +220,40 @@ class CTFactorGraph(FactorGraph):
                 # add noisyOR factors
                 degree = node[1]["ParentNumber"]
                 # pre-define the CPD array and fill it with the noisyOR values
-                cpdArray = np.full([2, degree + 1], 1 - alpha)
-                cpdArray_regularized = np.full([2, degree + 1], 1 - alpha)
-                ExponentArray = np.arange(0, degree + 1)
-                divideArray = np.concatenate(
+                cpd_array = np.full([2, degree + 1], 1 - alpha)
+                cpd_array_regularized = np.full([2, degree + 1], 1 - alpha)
+                exponent_array = np.arange(0, degree + 1)
+                divide_array = np.concatenate(
                     (np.asarray([1]), np.arange(1, degree + 1))
                 )
                 # regularize cpd priors to penalize higher number of parents
                 # log domain to avoid underflow
-                cpdArray[0, :] = np.power(cpdArray[0, :], ExponentArray) * (1 - beta)
-                cpdArray_regularized[0, :] = np.divide(
-                    np.power(cpdArray[0, :], ExponentArray) * (1 - beta), divideArray
+                cpd_array[0, :] = np.power(cpd_array[0, :], exponent_array) * (1 - beta)
+                cpd_array_regularized[0, :] = np.divide(
+                    np.power(cpd_array[0, :], exponent_array) * (1 - beta), divide_array
                 )
-                # check0 = cpdArray_regularized[0,:]
-                # check1 = cpdArray[0,:]
-                cpdArray[1, :] = np.add(-cpdArray[0, :], 1)
-                cpdArray_regularized[1, :] = np.add(-cpdArray_regularized[0, :], 1)
-                cpdArray = np.transpose(array_utils.normalize(cpdArray))
-                cpdArray_regularized = array_utils.avoid_underflow(
-                    np.transpose(array_utils.normalize(cpdArray_regularized))
+                # check0 = cpd_array_regularized[0,:]
+                # check1 = cpd_array[0,:]
+                cpd_array[1, :] = np.add(-cpd_array[0, :], 1)
+                cpd_array_regularized[1, :] = np.add(-cpd_array_regularized[0, :], 1)
+                cpd_array = np.transpose(array_utils.normalize(cpd_array))
+                cpd_array_regularized = array_utils.avoid_underflow(
+                    np.transpose(array_utils.normalize(cpd_array_regularized))
                 )
-                if regularized == True:
-                    FactorToAdd = Factor(
-                        cpdArray_regularized,
+                if regularized:
+                    factor_to_add = Factor(
+                        cpd_array_regularized,
                         ["placeholder", [node[0] + "0", node[0] + "1"]],
                     )
                 else:
-                    FactorToAdd = Factor(
-                        cpdArray, ["placeholder", [node[0] + "0", node[0] + "1"]]
+                    factor_to_add = Factor(
+                        cpd_array, ["placeholder", [node[0] + "0", node[0] + "1"]]
                     )
 
                 # add factor & its edges to network as an extra node
-                nx.set_node_attributes(self, {node[0]: FactorToAdd}, "InitialBelief")
+                nx.set_node_attributes(self, {node[0]: factor_to_add}, "InitialBelief")
 
-    def FillInPriors(self, prior):
+    def fill_in_priors(self, prior):
         """fills in the taxon priors according to the given prior"""
 
         for node in self.nodes(data=True):
@@ -297,11 +265,12 @@ class CTFactorGraph(FactorGraph):
                 )
 
 
-def GenerateCTFactorGraphs(ListOfFactorGraphs, GraphType="Taxons"):
-    if type(ListOfFactorGraphs) is not list:
-        ListOfFactorGraphs = [ListOfFactorGraphs]
-    for Graph in ListOfFactorGraphs:
-        CTFactorgraph = CTFactorGraph(
-            Graph, GraphType
+def generate_ct_factor_graphs(list_of_factor_graphs, graph_type="Taxons"):
+    if type(list_of_factor_graphs) is not list:
+        list_of_factor_graphs = [list_of_factor_graphs]
+    for graph in list_of_factor_graphs:
+        ct_factor_graph = CTFactorGraph(
+            graph, graph_type
         )  # ListOfCTFactorGraphs.append(CTFactorGraph(Graph,GraphType))
-    return CTFactorgraph
+    # TODO: shouldn't this return all factor graphs???
+    return ct_factor_graph

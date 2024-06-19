@@ -57,13 +57,13 @@ parser.add_argument(
 args = parser.parse_args()
 
 ct_factor_graph = CTFactorGraph(args.graphml_path)
-ct_factor_graph.FillInFactors(args.alpha, args.beta, args.regularized)
-ct_factor_graph.FillInPriors(args.prior)
-ct_factor_graph.AddCTNodes()
+ct_factor_graph.fill_in_factors(args.alpha, args.beta, args.regularized)
+ct_factor_graph.fill_in_priors(args.prior)
+ct_factor_graph.add_ct_nodes()
 
 
 ct_factor_graphs = [
-    SeparateSubgraphs(ct_factor_graph, filter_nodes)
+    separate_subgraphs(ct_factor_graph, filter_nodes)
     for filter_nodes in nx.connected_components(ct_factor_graph)
 ]
 
