@@ -2,7 +2,6 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 import array_utils
-import random
 
 from collections import namedtuple
 
@@ -49,7 +48,7 @@ class TaxonGraph(nx.Graph):
         intermediate_graph.add_nodes_from(taxa_attributes)
 
         # cluster the resulting graph with the louvain algorithm
-        communities = nx.community.louvain_communities(intermediate_graph)
+        communities = nx.community.louvain_communities(intermediate_graph, seed=12345)
         # separate the graph into its communities and enter into same graph object
         for i, community in enumerate(communities):
             subgraph = intermediate_graph.subgraph(community)
