@@ -5,6 +5,7 @@ benchmarks/
 initial_benchmarks/
 
 .idea/
+*.iml
 
 # dotenv
 .env
