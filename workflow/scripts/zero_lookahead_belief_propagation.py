@@ -3,6 +3,7 @@
 import time
 import numpy.typing as npt
 import numpy as np
+import numba as nb
 
 from convolution_tree import *
 from factor_graph_generation import *
@@ -19,8 +20,6 @@ class Messages:
     # class that holds the messages of iteration t and iteration t+1 as dictionaries
     def __init__(self, ct_graph_in: CTFactorGraph):
         # TODO check if I truly need all three of msg new, msglog and msg.
-        # A list of the IDs of the convolution tree's that have already been checked
-        self.list_of_cts: Set[int] = set()
         self.graph: CTFactorGraph = ct_graph_in
         self.max_val: Optional[Tuple[int, int]] = None
         self.priorities: pqdict = pqdict({}, reverse=True)
@@ -202,8 +201,6 @@ class Messages:
                 )
                 return np.asarray([np.sum(out_messages[0, :]), np.sum(out_messages[1, :])])
 
-                # CTree, computes all out messages in one go
-
     def compute_out_messages_ct_tree(self, node: int):
         prot_prob_list: List[npt.NDArray[np.float64]] = []
         old_prot_prob_list: List[npt.NDArray[np.float64]] = []
@@ -229,9 +226,8 @@ class Messages:
                     array_utils.avoid_underflow(shared_likelihoods), self.msg_log[node_in, node]
                 )
 
-        # TODO: Tanja, does this need to be or / and?
         if (
-                all(old_shared_likelihoods != shared_likelihoods) and
+                not np.array_equal(old_shared_likelihoods, shared_likelihoods) and
                 any(
                     prot_prob_list[i][0] != old_prot_prob_list[i][0]
                     for i in range(len(prot_prob_list))
@@ -258,14 +254,6 @@ class Messages:
 
             for pep in peptides:
                 self.msg_new[node, pep] = self.msg[node, pep]
-
-    # keeps track of which CTs have been update already in the current computeUpdate() loop
-    def ct_update_check(self, ct_node_id: int) -> bool:
-        if ct_node_id in self.list_of_cts:
-            return False
-        else:
-            self.list_of_cts.add(ct_node_id)
-            return True
 
     def compute_infinity_norm_residual(self, start_node: int, end_node: int) -> float:
         msg1 = self.msg[start_node, end_node]
@@ -317,7 +305,7 @@ class Messages:
                 )
 
     # computes new message for a given edge (startname, endname) in the direction startname -> endname
-    def single_edge_direction_update(self, start_node: int, end_node: int):
+    def single_edge_direction_update(self, start_node: int, end_node: int, checked_cts: set[int]):
         if (
                 self.categories[start_node] == self.category
                 or self.categories[start_node] == "peptide"
@@ -326,8 +314,9 @@ class Messages:
                 start_node, end_node
             )
 
-        if self.categories[start_node] == "Convolution Tree" and self.ct_update_check(start_node):
+        if self.categories[start_node] == "Convolution Tree" and start_node not in checked_cts:
             self.compute_out_messages_ct_tree(start_node)
+            checked_cts.add(start_node)
 
         if self.categories[start_node] == "factor":
             self.msg_new[start_node, end_node] = self.compute_out_message_factor(
@@ -336,14 +325,12 @@ class Messages:
 
     # compute updated messages for all edges
     def compute_update(self, local_loops: bool = False):
-        self.list_of_cts = set()  # keeps track of which CT has already been active
-
-        assert isinstance(local_loops, bool), "local_loops needs to be boolean"
+        checked_cts: set[int] = set()  # keeps track of which CT has already been active
 
         if local_loops and self.max_val:
             for end_node in self.neighbours[self.max_val[1]]:
                 start_node = self.max_val[1]
-                self.single_edge_direction_update(start_node, end_node)
+                self.single_edge_direction_update(start_node, end_node, checked_cts)
 
         else:
             for edge in self.edges:
@@ -351,11 +338,11 @@ class Messages:
                 start_node: int = edge[0]
                 end_node: int = edge[1]
 
-                self.single_edge_direction_update(start_node, end_node)
+                self.single_edge_direction_update(start_node, end_node, checked_cts)
 
                 start_node: int = edge[1]
                 end_node: int = edge[0]
-                self.single_edge_direction_update(start_node, end_node)
+                self.single_edge_direction_update(start_node, end_node, checked_cts)
 
     def get_priority_message(self, priority_vector: pqdict) -> Tuple[int, int]:
         self.max_val = priority_vector.top()
@@ -385,25 +372,15 @@ class Messages:
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
         for edge in self.edges:
             # compute all residuals of the messages in this loop
-            start_node, end_node = edge[1], edge[0]
-            self.full_residuals[
-                (start_node, end_node)
-            ] = self.compute_infinity_norm_residual(start_node, end_node)
+            for start_node, end_node in [(edge[1], edge[0]), (edge[0], edge[1])]:
+                self.full_residuals[
+                    (start_node, end_node)
+                ] = self.compute_infinity_norm_residual(start_node, end_node)
 
-            # initialize the total residual to 0
-            for end2 in self.neighbours[end_node]:
-                self.total_residuals[((start_node, end_node), (end_node, end2))] = 0
-                self.total_residuals[((end2, end_node), (end_node, start_node))] = 0
-
-            start_node, end_node = edge[0], edge[1]
-            self.full_residuals[
-                (start_node, end_node)
-            ] = self.compute_infinity_norm_residual(start_node, end_node)
-
-            # initialize the total residual to 0
-            for end2 in self.neighbours[end_node]:
-                self.total_residuals[((start_node, end_node), (end_node, end2))] = 0
-                self.total_residuals[((end2, end_node), (end_node, start_node))] = 0
+                # initialize the total residual to 0
+                for end2 in self.neighbours[end_node]:
+                    self.total_residuals[((start_node, end_node), (end_node, end2))] = 0
+                    self.total_residuals[((end2, end_node), (end_node, start_node))] = 0
 
         # set the priority vector once with copy of the previously calculated residuals
         self.priorities = pqdict(self.full_residuals.copy(), reverse=True)
@@ -412,11 +389,12 @@ class Messages:
 
         print(f"\rTime spent in loop 0/{max_loops}: 0s -> residual max 0", end="")
         while k < max_loops and max_residual > tolerance:
+            checked_cts: set[int] = set()
             # actual zero-look-ahead-BP part
             start_t = time.time()
             priority_message = self.get_priority_message(self.priorities)
             max_residual = self.priorities[priority_message]
-            self.single_edge_direction_update(priority_message[0], priority_message[1])
+            self.single_edge_direction_update(priority_message[0], priority_message[1], checked_cts)
             priority_residual = self.compute_infinity_norm_residual(
                 priority_message[0], priority_message[1]
             )

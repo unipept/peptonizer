@@ -6,23 +6,17 @@ import array_utils
 from collections import namedtuple
 
 
-class ProteinPeptideGraph(nx.Graph):
-    # Class for storing the protein-peptide graph with scores and priors but no factors, e.g for visual representation.
-    pass
-
-
 class TaxonGraph(nx.Graph):
     """
     Class with functions to construct a peptide-taxon graph using Entrez/NCBI mapping.
     """
-
     def __init__(self):
-        nx.Graph.__init__(self)
+        super().__init__()
         self.taxon_id_list = []
 
     def create_from_unipept_response_csv(self, csv_path):
         unipept_response = pd.read_csv(csv_path)
-        # drop rows that have an entry in Highertaxa that appears only once
+        # drop rows that have an entry in HigherTaxa that appears only once
         counts = unipept_response["HigherTaxa"].value_counts()
         unipept_response = unipept_response[
             unipept_response["HigherTaxa"].isin(counts[counts > 1].index)
@@ -49,6 +43,7 @@ class TaxonGraph(nx.Graph):
 
         # cluster the resulting graph with the louvain algorithm
         communities = nx.community.louvain_communities(intermediate_graph, seed=12345)
+
         # separate the graph into its communities and enter into same graph object
         for i, community in enumerate(communities):
             subgraph = intermediate_graph.subgraph(community)
@@ -66,8 +61,6 @@ class Factor:
 
 
 # the variable and factor types might be unecessary as i do not need a lot of flexibility in the input
-
-# TODO implement checking& error raising if input aren't np.array/ list or array like
 
 
 class FactorGraph(nx.Graph):
@@ -197,7 +190,7 @@ class CTFactorGraph(FactorGraph):
             sorted(nx.closeness_centrality(self).items(), key=lambda item: item[1])
         )
         betweenness_centrality = dict(
-            nx.betweenness_centrality(self).items(), key=lambda item: item[1]
+            sorted(nx.betweenness_centrality(self).items(), key=lambda item: item[1])
         )
         eigen_centrality = dict(
             nx.eigenvector_centrality(self).items(), key=lambda item: item[1]
@@ -271,5 +264,5 @@ def generate_ct_factor_graphs(list_of_factor_graphs, graph_type="Taxons"):
         ct_factor_graph = CTFactorGraph(
             graph, graph_type
         )  # ListOfCTFactorGraphs.append(CTFactorGraph(Graph,GraphType))
-    # TODO: shouldn't this return all factor graphs???
+    # TODO Tanja: shouldn't this return all factor graphs???
     return ct_factor_graph
