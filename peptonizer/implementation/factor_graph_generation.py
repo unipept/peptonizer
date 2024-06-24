@@ -266,3 +266,15 @@ def generate_ct_factor_graphs(list_of_factor_graphs, graph_type="Taxons"):
         )  # ListOfCTFactorGraphs.append(CTFactorGraph(Graph,GraphType))
     # TODO Tanja: shouldn't this return all factor graphs???
     return ct_factor_graph
+
+
+def generate_pepgm_graph(
+    graph_data_frame_file: str,
+    graph_ml_output_file: str
+):
+    taxon_graph = TaxonGraph()
+    taxon_graph.create_from_unipept_response_csv(graph_data_frame_file)
+    factor_graph = FactorGraph()
+    factor_graph.construct_from_existing_graph(taxon_graph)
+    ct_factor_graph = generate_ct_factor_graphs(factor_graph)
+    ct_factor_graph.save_to_graph_ml(graph_ml_output_file)

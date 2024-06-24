@@ -1,6 +1,6 @@
 import argparse
 
-from peptonizer import factor_graph_generation
+from peptonizer import generate_pepgm_graph
 
 
 parser = argparse.ArgumentParser(
@@ -22,9 +22,4 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-taxon_graph = TaxonGraph()
-taxon_graph.create_from_unipept_response_csv(args.graph_data_frame)
-factor_graph = FactorGraph()
-factor_graph.construct_from_existing_graph(taxon_graph)
-ct_factor_graph = generate_ct_factor_graphs(factor_graph)
-ct_factor_graph.save_to_graph_ml(args.out)
+generate_pepgm_graph(args.graph_data_frame, args.out)
