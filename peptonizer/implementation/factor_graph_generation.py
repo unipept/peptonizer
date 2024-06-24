@@ -1,8 +1,8 @@
 import numpy as np
 import networkx as nx
 import pandas as pd
-import array_utils
 
+from . import array_utils
 from collections import namedtuple
 
 
@@ -124,7 +124,7 @@ class CTFactorGraph(FactorGraph):
             self.category = "protein"
 
         if isinstance(graph_in, str):
-            graph_in = nx.read_graphml(graph_in)
+            graph_in = nx.parse_graphml(graph_in)
 
         # need these to create a new instance of a CT fractorgraph and not overwrite the previous graph
         self.add_edges_from(graph_in.edges(data=True))
@@ -140,6 +140,7 @@ class CTFactorGraph(FactorGraph):
         list_of_prot_lists = []
         list_of_cts = []
         list_of_factors = []
+
         for node in self.nodes(data=True):
             # go through all factors with degree>2 and get their protein lists, then generate their conv. trees
             if node[1]["category"] == "factor" and self.degree[node[0]] > 2:
@@ -163,8 +164,7 @@ class CTFactorGraph(FactorGraph):
         for i in range(len(list_of_cts)):
             self.add_node(
                 "CTree " + " ".join(str(list_of_prot_lists[i])),
-                ConvolutionTree=str(list_of_cts[i][0]),
-                category="Convolution Tree",
+                category="convolution_tree",
                 NumberOfParents=len(list_of_prot_lists[i]),
             )
             self.add_edge(

@@ -1,5 +1,7 @@
 import argparse
-from factor_graph_generation import *
+
+from peptonizer import factor_graph_generation
+
 
 parser = argparse.ArgumentParser(
     description="Run the PepGM algorithm from command line"

@@ -1,8 +1,9 @@
 import numpy as np
 import numpy.typing as npt
 import math
-import array_utils
 
+
+from . import array_utils
 from typing import List, Optional
 from scipy.signal import fftconvolve
 

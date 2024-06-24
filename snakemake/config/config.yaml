@@ -54,4 +54,4 @@ taxa_in_plot: 25
 
 # Run a profiler on the scripts that can be used for advanced analysis of the tasks performed by this workflow. The
 # workflow will then generate a `.prof` file for each Snakemake rule in the benchmarks directory.
-profile: True
+profile: False

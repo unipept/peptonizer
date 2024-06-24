@@ -7,53 +7,7 @@ from ete3 import NCBITaxa
 ncbi = NCBITaxa()
 
 
-def is_gzipped_file(filename):
-    """Check if input is gzipped."""
-    with open(filename, "rb") as f:
-        head = f.read(2)
-    return head == b"\x1f\x8b"
-
-
-def init_argparser():
-    """Init argument parser."""
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--unipept-response-file",
-        type=str,
-        required=True,
-        help="Input: path to a Unipept response '.json' file that's been produced earlier in the pipeline.",
-    )
-    parser.add_argument(
-        "--number-of-taxa",
-        type=int,
-        required=True,
-        help="Number of taxa to include in the final Peptonizer2000 output.",
-    )
-    parser.add_argument("--out", type=str, required=True, help="path to csv out file")
-    parser.add_argument(
-        "--taxa-weight-file",
-        type=str,
-        required=False,
-        help="Output: path to a CSV-file that will contain all computed taxa weights.",
-    )
-    parser.add_argument(
-        "--unipept-peptide-counts",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "--taxon-rank",
-        type=str,
-        required=False,
-        default="species",
-        help="Taxonomic rank at which you want the Peptonizer2000 results to be resolved.",
-    )
-
-    return parser.parse_args()
-
-
-def GetPeptideCountPerTaxID(proteins_per_taxon):
+def get_peptide_count_per_tax_id(proteins_per_taxon):
     """
     Convert tab-separated taxon-protein counts to a dictionary.
     Parameters
@@ -75,7 +29,7 @@ def GetPeptideCountPerTaxID(proteins_per_taxon):
     return protein_counts_per_taxid
 
 
-def GetLineageAtSpecifiedRank(taxid, TaxaRank):
+def get_lineage_at_specified_rank(taxid, TaxaRank):
     """
     Returns the taxid of the specified rank in the lineage of any taxid given as argument
     -----
@@ -86,42 +40,42 @@ def GetLineageAtSpecifiedRank(taxid, TaxaRank):
     """
     taxids = set()
     for tax in taxid:
-        RankTaxidDict = ncbi.get_rank(ncbi.get_lineage(tax))
-        RankTaxidDict = {rank: taxiid for taxiid, rank in RankTaxidDict.items()}
+        rank_taxid_dict = ncbi.get_rank(ncbi.get_lineage(tax))
+        rank_taxid_dict = {rank: taxid for taxid, rank in rank_taxid_dict.items()}
 
         try:
-            taxids.add(RankTaxidDict[str(TaxaRank)])
+            taxids.add(rank_taxid_dict[str(TaxaRank)])
         except:
             taxids.add(tax)
 
     return list(taxids)
 
 
-def WeightTaxa(
-    UnipeptResponse,
-    PeptScoreDict,
-    MaxTax,
-    *PeptidesPerTaxon,
+def perform_taxa_weighing(
+    unipept_response,
+    pept_score_dict: str,
+    max_tax,
+    *peptides_per_taxon,
     chunks=True,
-    N=0,
-    SelectRank=True,
-    TaxaRank="species"
+    n=0,
+    select_rank=True,
+    taxa_rank="species"
 ):
     """
     Weight inferred taxa based on their (1) degeneracy and (2) their proteome size.
     Parameters
     ----------
-    UnipeptResponse: str
+    unipept_response: str
         Path to Unipept response json file
-    PeptScoreDict: dict
+    pept_score_dict: str
         Dictionary that contains peptide to score & number of PSMs map
-    MaxTax: int
+    max_tax: int
         Maximum number of taxons to include in the graphical model
-    PeptidesPerTaxon: str
+    peptides_per_taxon: str
         Path to the file that contains the size of the proteome per taxID (tab-separated)
     chunks: bool
         Allow memory-efficient reading of large json files
-    N: int
+    n: int
         tbd
 
     Returns
@@ -131,12 +85,13 @@ def WeightTaxa(
 
     """
     print("Parsing Unipept responses from disk...")
-    with open(PeptScoreDict, "r") as file:
-        PeptScoreDictload = json.load(file)
+
+    with open(pept_score_dict, "r") as file:
+        pept_score_dict_loaded = json.load(file)
 
     if chunks:
-        with open(UnipeptResponse, 'r') as file:
-            UnipeptDict = {"peptides": []}
+        with open(unipept_response, 'r') as file:
+            unipept_dict = {"peptides": []}
             for line in file:
                 try:
                     # Get rid of the functional annotations from the response in order to speed up the JSON
@@ -145,7 +100,7 @@ def WeightTaxa(
                     for obj in pept_data:
                         del obj["fa"]
                     # Delete functional annotations (since we are not using these at the moment)
-                    UnipeptDict["peptides"].extend(pept_data)
+                    unipept_dict["peptides"].extend(pept_data)
                 except:
                     # TODO: Pieter fixes internal server error
                     # in the meantime, we work with the incomplete mapping
@@ -153,18 +108,18 @@ def WeightTaxa(
                     continue
 
     else:
-        with open(UnipeptResponse, "r") as file:
-            UnipeptDict = json.load(file)
+        with open(unipept_response, "r") as file:
+            unipept_dict = json.load(file)
 
     # Convert a JSON object into a Pandas DataFrame
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
-    UnipeptFrame = pd.json_normalize(UnipeptDict, record_path=["peptides"])
+    unipept_frame = pd.json_normalize(unipept_dict, record_path=["peptides"])
     # Merge psm_score and number of psms
-    UnipeptFrame = pd.concat(
+    unipept_frame = pd.concat(
         [
-            UnipeptFrame,
-            pd.json_normalize(UnipeptFrame["sequence"].map(PeptScoreDictload)),
+            unipept_frame,
+            pd.json_normalize(unipept_frame["sequence"].map(pept_score_dict_loaded)),
         ],
         axis=1,
     )
@@ -173,23 +128,23 @@ def WeightTaxa(
     # how conserved a peptide sequence is between taxa.
     # map all taxids in the list in the taxa column back to their taxid at species level
     print("Started mapping all taxon ids to the specified rank...")
-    UnipeptFrame["HigherTaxa"] = UnipeptFrame.apply(
-        lambda row: GetLineageAtSpecifiedRank(row["taxa"], TaxaRank), axis=1
+    unipept_frame["HigherTaxa"] = unipept_frame.apply(
+        lambda row: get_lineage_at_specified_rank(row["taxa"], taxa_rank), axis=1
     )
 
     # Divide the number of PSMs of a peptide by the number of taxa the peptide is associated with, exponentiated by 3
     print("Started dividing the number of PSMS of a peptide by the number the peptide is associated with...")
-    UnipeptFrame["weight"] = UnipeptFrame["psms"].div(
-        [len(element) ** 3 for element in UnipeptFrame["HigherTaxa"]]
+    unipept_frame["weight"] = unipept_frame["psms"].div(
+        [len(element) ** 3 for element in unipept_frame["HigherTaxa"]]
     )
-    mask = [len(element) == 1 for element in UnipeptFrame["HigherTaxa"]]
-    UniquePSMTaxa = set(i[0] for i in UnipeptFrame["HigherTaxa"][mask])
-    UnipeptFrame = UnipeptFrame.explode("HigherTaxa", ignore_index=True)
+    mask = [len(element) == 1 for element in unipept_frame["HigherTaxa"]]
+    unique_psm_taxa = set(i[0] for i in unipept_frame["HigherTaxa"][mask])
+    unipept_frame = unipept_frame.explode("HigherTaxa", ignore_index=True)
 
     # Sum up the weights of a taxon and sort by weight
     print("Started summing the weights of a taxon and sorting them by weight...")
-    UnipeptFrame["log_weight"] = np.log10(UnipeptFrame["weight"] + 1)
-    TaxIDWeights = UnipeptFrame.groupby("HigherTaxa")["log_weight"].sum().reset_index()
+    unipept_frame["log_weight"] = np.log10(unipept_frame["weight"] + 1)
+    tax_id_weights = unipept_frame.groupby("HigherTaxa")["log_weight"].sum().reset_index()
     # Retrieve the proteome size per taxid as a dictionary
     # This file was previously prepared by filtering a generic accession 2 taxid mapping file
     # to swissprot (i.e., reviewed) proteins only
@@ -203,56 +158,43 @@ def WeightTaxa(
     # Since large proteomes tend to have more detectable peptides,
     # we adjust the weight by dividing by the size of the proteome i.e.,
     # the number of proteins that are associated with a taxon
-    TaxIDWeights["scaled_weight"] = TaxIDWeights[
+    tax_id_weights["scaled_weight"] = tax_id_weights[
         "log_weight"
     ]  # / (TaxIDWeights["proteome_size"]) ** N
 
     # Retrieves the specified taxonomic rank taxid in the lineage of each of the species-level taxids returned by
     # Unipept for both the UnipeptFrame and the TaxIdWeightFrame
-    if SelectRank == True:
+    if select_rank:
         # TaxIDWeights['HigherTaxa'] = TaxIDWeights.apply(lambda row: GetLineageAtSpecifiedRank(row['taxa'],TaxaRank), axis = 1)
         # UnipeptFrame['HigherTaxa'] = UnipeptFrame.apply(lambda row: GetLineageAtSpecifiedRank(row['taxa'],TaxaRank), axis = 1)
-        HigherUniquePSMtaxids = UniquePSMTaxa  # set([GetLineageAtSpecifiedRank(i,TaxaRank) for i in UniquePSMTaxa])
+        higher_unique_psm_taxids = unique_psm_taxa  # set([GetLineageAtSpecifiedRank(i,TaxaRank) for i in UniquePSMTaxa])
 
     # group the duplicate entries of higher up taxa and sum their weights
     print("Started grouping duplicate entries of taxa situated higher up and sum their weights...")
-    HigherTaxidWeights = (
-        TaxIDWeights.groupby("HigherTaxa")["scaled_weight"]
+    higher_taxid_weights = (
+        tax_id_weights.groupby("HigherTaxa")["scaled_weight"]
         .sum()
         .reset_index()
         .sort_values(by=["scaled_weight"], ascending=False)
     )
     # HigherTaxidWeights = TaxIDWeights
-    HigherTaxidWeights["Unique"] = np.where(
-        HigherTaxidWeights["HigherTaxa"].isin(HigherUniquePSMtaxids), True, False
+    higher_taxid_weights["Unique"] = np.where(
+        higher_taxid_weights["HigherTaxa"].isin(higher_unique_psm_taxids), True, False
     )
 
     try:
-        HigherTaxidWeights = HigherTaxidWeights[
-            HigherTaxidWeights.HigherTaxa != 1869227
+        higher_taxid_weights = higher_taxid_weights[
+            higher_taxid_weights.HigherTaxa != 1869227
         ]
     except:
         pass
 
-    if len(HigherTaxidWeights.HigherTaxa) < 50:
-        return UnipeptFrame, HigherTaxidWeights
+    if len(higher_taxid_weights.HigherTaxa) < 50:
+        return unipept_frame, higher_taxid_weights
     else:
-        TaxaToInclude = set(HigherTaxidWeights["HigherTaxa"][0:MaxTax])
-        TaxaToInclude.update(HigherUniquePSMtaxids)
-        UnipeptFrame[UnipeptFrame["HigherTaxa"].isin(TaxaToInclude)]
+        taxa_to_include = set(higher_taxid_weights["HigherTaxa"][0:max_tax])
+        taxa_to_include.update(higher_unique_psm_taxids)
         return (
-            UnipeptFrame[UnipeptFrame["HigherTaxa"].isin(TaxaToInclude)],
-            HigherTaxidWeights,
+            unipept_frame[unipept_frame["HigherTaxa"].isin(taxa_to_include)],
+            higher_taxid_weights,
         )
-
-
-args = init_argparser()
-DF, Weights = WeightTaxa(
-    args.unipept_response_file,
-    args.unipept_peptide_counts,
-    args.number_of_taxa,
-    TaxaRank=args.taxon_rank,
-)
-print("Started dumping produced results to CSV-files...")
-DF.to_csv(args.out)
-Weights.to_csv(args.taxa_weight_file)

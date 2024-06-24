@@ -1,8 +1,6 @@
 import argparse
-import networkx as nx
 
-from zero_lookahead_belief_propagation import *
-from factor_graph_generation import *
+from peptonizer import run_belief_propagation
 
 
 parser = argparse.ArgumentParser(
@@ -56,18 +54,16 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-ct_factor_graph = CTFactorGraph(args.graphml_path)
-ct_factor_graph.fill_in_factors(args.alpha, args.beta, args.regularized)
-ct_factor_graph.fill_in_priors(args.prior)
-ct_factor_graph.add_ct_nodes()
+with open(args.graphml_path, 'r') as in_file:
+    csv_content = run_belief_propagation(
+        in_file.read(),
+        args.alpha,
+        args.beta,
+        args.regularized,
+        args.prior,
+        args.max_iter,
+        args.tol
+    )
 
-
-ct_factor_graphs = [
-    separate_subgraphs(ct_factor_graph, filter_nodes)
-    for filter_nodes in nx.connected_components(ct_factor_graph)
-]
-
-results_dict, node_types = calibrate_all_subgraphs(
-    ct_factor_graphs, args.max_iter, args.tol
-)
-save = save_results_to_csv(results_dict, node_types, args.out)
+    with open(args.out, 'w') as out_file:
+        out_file.write(csv_content)

@@ -1,14 +1,11 @@
 # implementation of belief propagation on a peptide-protein graph
 # __________________________________________________________________________________________
 import time
-import numpy.typing as npt
-import numpy as np
-import numba as nb
 
-from convolution_tree import *
-from factor_graph_generation import *
-from pqdict import pqdict
-from typing import Set, Dict, Any, List, Tuple, Iterator
+from .convolution_tree import *
+from .factor_graph_generation import *
+from .pqdict import pqdict
+from typing import Dict, Any, List, Tuple, Iterator
 
 
 class Messages:
@@ -20,7 +17,6 @@ class Messages:
     # class that holds the messages of iteration t and iteration t+1 as dictionaries
     def __init__(self, ct_graph_in: CTFactorGraph):
         # TODO check if I truly need all three of msg new, msglog and msg.
-        self.graph: CTFactorGraph = ct_graph_in
         self.max_val: Optional[Tuple[int, int]] = None
         self.priorities: pqdict = pqdict({}, reverse=True)
         self.category: str = ct_graph_in.category
@@ -35,8 +31,6 @@ class Messages:
         self.neighbours: List[List[int]] = []
         # Keeps track of the number of parents of a node
         self.number_of_parents: List[int] = []
-        # Keeps track of node IDs that are of the CPD type
-        self.cpds: Set[int] = set()
         # Keep track of all edges (with node IDs)
         self.edges: List[Tuple[int, int]] = []
 
@@ -44,7 +38,9 @@ class Messages:
         self.full_residuals: Dict[Tuple[int, int], float] = {}
         self.total_residuals: Dict[Tuple[Tuple[int, int], Tuple[int, int]], float] = {}
 
+        # Maps a node ID onto its initial belief value
         self.initial_beliefs: List[npt.NDArray[np.float64]] = []
+        # Maps a node ID onto its current belief value
         self.current_beliefs: List[npt.NDArray[np.float64]] = []
 
         self.msg: Dict[Tuple[int, int], npt.NDArray[np.float64]] = {}
@@ -62,13 +58,10 @@ class Messages:
             self.categories.append(node[1]["category"])
 
             # Only convolution trees have a number of parents property assigned to them.
-            if node[1]["category"] == "Convolution Tree":
+            if node[1]["category"] == "convolution_tree":
                 self.number_of_parents.append(node[1]["NumberOfParents"])
             else:
                 self.number_of_parents.append(0)
-
-            if "CPD" in str(node[0]):
-                self.cpds.add(node_id)
 
             if node[1]["category"] == "factor":
                 self.initial_beliefs.append(node[1]["InitialBelief"].factor.array)
@@ -83,8 +76,9 @@ class Messages:
 
         # Now that all nodes have been processed, we need to replace all the neighbours of a node by their node IDs
         for (node_id, node) in enumerate(ct_graph_in.nodes(data=True)):
-            self.neighbours.append([self.node_descriptions[n] for n in self.graph.neighbors(node[0])])
+            self.neighbours.append([self.node_descriptions[n] for n in ct_graph_in.neighbors(node[0])])
 
+        # Now, also replace the edge descriptions by the corresponding node IDs
         for start_node, end_node, data in ct_graph_in.edges(data=True):
             start_node_id = self.node_descriptions[start_node]
             end_node_id = self.node_descriptions[end_node]
@@ -156,7 +150,7 @@ class Messages:
                         self.get_incoming_message_factor(node_out_neighbour, node_out)
                     )
 
-        if self.categories[node_in] == "Convolution Tree":
+        if self.categories[node_in] == "convolution_tree":
             # handles empty & messages with only one value
             incoming_messages.append(np.asarray([1.0, 1.0]))
             in_messages_array: npt.NDArray[np.float64] = np.asarray(incoming_messages).reshape(
@@ -210,7 +204,7 @@ class Messages:
         prot_list: List[int] = []
 
         for node_in in self.neighbours[node]:
-            if node_in not in self.cpds:
+            if self.categories[node_in] != "factor":
                 prot_prob_list.append(self.msg[node_in, node])
                 old_prot_prob_list.append(self.msg_log[node_in, node])
                 prot_list.append(node_in)
@@ -314,7 +308,7 @@ class Messages:
                 start_node, end_node
             )
 
-        if self.categories[start_node] == "Convolution Tree" and start_node not in checked_cts:
+        if self.categories[start_node] == "convolution_tree" and start_node not in checked_cts:
             self.compute_out_messages_ct_tree(start_node)
             checked_cts.add(start_node)
 
@@ -499,6 +493,37 @@ def save_results_to_csv(results_dict: Dict[str, npt.NDArray[np.float64]], node_d
         key: [results_dict[key][1], node_dict[key]] for key in results_dict.keys()
     }
 
-    pd.DataFrame.from_dict(data=full_results_dict, orient="index").to_csv(
-        name_string, header=False
-    )  # (datetime.now().strftime("%Y-%-m-%d-%H-%M-%S")+'-' +NameString + '-Results.csv', header = False)
+    return pd.DataFrame.from_dict(data=full_results_dict, orient="index").to_csv(header=False)
+
+
+def run_belief_propagation(
+        graphml_content: str,
+        alpha: float,
+        beta: float,
+        regularized: bool,
+        prior: float,
+        max_iter: int = 10000,
+        tol: float = 0.006
+    ):
+    """
+    Runs the belief propagation algorithm on a graph that's represented by the string in graphml_content with the
+    tuning parameters further specified to this function. This function returns a string that contains the result of
+    the belief propagation algorithm, represented as a CSV (and can thus directly be written to a CSV-file, if desired).
+    """
+
+    ct_factor_graph = CTFactorGraph(graphml_content)
+    ct_factor_graph.fill_in_factors(alpha, beta, regularized)
+    ct_factor_graph.fill_in_priors(prior)
+    ct_factor_graph.add_ct_nodes()
+
+    ct_factor_graphs = [
+        separate_subgraphs(ct_factor_graph, filter_nodes)
+        for filter_nodes in nx.connected_components(ct_factor_graph)
+    ]
+
+    results_dict, node_types = calibrate_all_subgraphs(
+        ct_factor_graphs, max_iter, tol
+    )
+
+    return save_results_to_csv(results_dict, node_types)
+
