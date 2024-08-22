@@ -1,6 +1,7 @@
 import argparse
+import gzip
 
-from peptonizer import parse_pout, parse_ms2rescore_output, fetch_unipept_taxon_information
+from peptonizer.peptonizer import parse_pout, parse_ms2rescore_output, fetch_unipept_taxon_information
 
 
 parser = argparse.ArgumentParser()
@@ -41,14 +42,28 @@ parser.add_argument(
     required=True,
     help="Output: path to logfile where failed Unipept query attempts are stored.",
 )
+parser.add_argument(
+    "--taxon-rank",
+    type=str,
+    required=False,
+    default="species",
+    help="Taxonomic rank at which you want the Peptonizer2000 results to be resolved.",
+)
 
 args = parser.parse_args()
 
-pep_score_psm = parse_ms2rescore_output(args.pout_file, args.fdr, "")
-fetch_unipept_taxon_information(
-    pep_score_psm,
-    args.unipept_peptide_counts,
-    args.unipept_response_file,
-    args.taxonomy_query,
-    args.log_file
-)
+for path in args.pout_file:
+    file_contents = []
+    with gzip.open(path, 'rt', encoding='utf-8') as file:
+        file_contents.append(file.read())
+
+    pep_score_psm = parse_ms2rescore_output(file_contents, args.fdr)
+
+    fetch_unipept_taxon_information(
+        pep_score_psm,
+        args.unipept_peptide_counts,
+        args.unipept_response_file,
+        args.taxonomy_query,
+        args.taxon_rank,
+        args.log_file
+    )

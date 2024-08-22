@@ -1,7 +1,7 @@
 import matplotlib
 import argparse
 
-from peptonizer import plot_peptonizer_results
+from peptonizer.peptonizer import plot_peptonizer_results
 
 """
 Script that takes PepGM .csv output, translates taxIDS to scientific names, and barplots the *number of results* highest

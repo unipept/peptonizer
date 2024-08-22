@@ -1,6 +1,6 @@
 import argparse
 
-from peptonizer import generate_pepgm_graph
+from peptonizer.peptonizer import generate_pepgm_graph
 
 
 parser = argparse.ArgumentParser(

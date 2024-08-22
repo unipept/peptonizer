@@ -10,9 +10,9 @@ setup(
         "networkx",
         "pandas"
     ],
-    author="Your Name",
-    author_email="your.email@example.com",
-    description="A simple example package",
+    author="Tanja Holstein",
+    author_email="tanja.holstein@ugent.be",
+    description="The Peptonizer allows you to easily find out which taxa are most likely present in a metaproteomics sample of interest.",
     url="https://github.com/yourusername/mypackage",  # Replace with your GitHub URL
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -1,10 +1,7 @@
-import argparse
 import json
 import numpy as np
 import pandas as pd
 from ete3 import NCBITaxa
-
-ncbi = NCBITaxa()
 
 
 def get_peptide_count_per_tax_id(proteins_per_taxon):
@@ -38,6 +35,7 @@ def get_lineage_at_specified_rank(taxid, TaxaRank):
     TaxaRank:
          rank you want to get
     """
+    ncbi = NCBITaxa()
     taxids = set()
     for tax in taxid:
         rank_taxid_dict = ncbi.get_rank(ncbi.get_lineage(tax))
@@ -57,9 +55,7 @@ def perform_taxa_weighing(
     max_tax,
     *peptides_per_taxon,
     chunks=True,
-    n=0,
-    select_rank=True,
-    taxa_rank="species"
+    n=0
 ):
     """
     Weight inferred taxa based on their (1) degeneracy and (2) their proteome size.
@@ -93,20 +89,8 @@ def perform_taxa_weighing(
         with open(unipept_response, 'r') as file:
             unipept_dict = {"peptides": []}
             for line in file:
-                try:
-                    # Get rid of the functional annotations from the response in order to speed up the JSON
-                    # normalization further down in the script.
-                    pept_data = json.loads(line)["peptides"]
-                    for obj in pept_data:
-                        del obj["fa"]
-                    # Delete functional annotations (since we are not using these at the moment)
-                    unipept_dict["peptides"].extend(pept_data)
-                except:
-                    # TODO: Pieter fixes internal server error
-                    # in the meantime, we work with the incomplete mapping
-                    # UnipeptDict["peptides"] = [json.loads(line)["peptides"]]
-                    continue
-
+                pept_data = json.loads(line)["peptides"]
+                unipept_dict["peptides"].extend(pept_data)
     else:
         with open(unipept_response, "r") as file:
             unipept_dict = json.load(file)
@@ -126,7 +110,7 @@ def perform_taxa_weighing(
 
     # Score the degeneracy of a taxa, i.e.,
     # how conserved a peptide sequence is between taxa.
-    # map all taxids in the list in the taxa column back to their taxid at species level
+    # map all taxids in the list in the taxa column back to their taxid at species level (or the rank specified by the user)
     print("Started mapping all taxon ids to the specified rank...")
     unipept_frame["HigherTaxa"] = unipept_frame.apply(
         lambda row: get_lineage_at_specified_rank(row["taxa"], taxa_rank), axis=1

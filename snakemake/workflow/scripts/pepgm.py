@@ -1,6 +1,6 @@
 import argparse
 
-from peptonizer import run_belief_propagation
+from peptonizer.peptonizer import run_belief_propagation
 
 
 parser = argparse.ArgumentParser(
