@@ -64,16 +64,9 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
         # Perform the HTTP POST request
         response = requests.post(url, json=payload)
 
-        print(f"Performing request with peptides: {peptides}")
-        print("Response is: ")
-        print(f"{response}")
-
         # Check if the request was successful
         if response.status_code == 200:
             data = response.json()
-
-            print("Response data is: ")
-            print(f"{data}")
 
             # Process each peptide result in the response
             for peptide_data in data.get("peptides", []):

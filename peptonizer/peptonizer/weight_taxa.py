@@ -1,7 +1,6 @@
 import json
 import numpy as np
 import pandas as pd
-from ete3 import NCBITaxa
 
 
 def get_peptide_count_per_tax_id(proteins_per_taxon):
@@ -26,35 +25,11 @@ def get_peptide_count_per_tax_id(proteins_per_taxon):
     return protein_counts_per_taxid
 
 
-def get_lineage_at_specified_rank(taxid, TaxaRank):
-    """
-    Returns the taxid of the specified rank in the lineage of any taxid given as argument
-    -----
-    taxid: int
-         taxid to get the lineage of
-    TaxaRank:
-         rank you want to get
-    """
-    ncbi = NCBITaxa()
-    taxids = set()
-    for tax in taxid:
-        rank_taxid_dict = ncbi.get_rank(ncbi.get_lineage(tax))
-        rank_taxid_dict = {rank: taxid for taxid, rank in rank_taxid_dict.items()}
-
-        try:
-            taxids.add(rank_taxid_dict[str(TaxaRank)])
-        except:
-            taxids.add(tax)
-
-    return list(taxids)
-
-
 def perform_taxa_weighing(
     unipept_response,
     pept_score_dict: str,
     max_tax,
     *peptides_per_taxon,
-    chunks=True,
     n=0
 ):
     """
@@ -69,8 +44,6 @@ def perform_taxa_weighing(
         Maximum number of taxons to include in the graphical model
     peptides_per_taxon: str
         Path to the file that contains the size of the proteome per taxID (tab-separated)
-    chunks: bool
-        Allow memory-efficient reading of large json files
     n: int
         tbd
 
@@ -85,20 +58,13 @@ def perform_taxa_weighing(
     with open(pept_score_dict, "r") as file:
         pept_score_dict_loaded = json.load(file)
 
-    if chunks:
-        with open(unipept_response, 'r') as file:
-            unipept_dict = {"peptides": []}
-            for line in file:
-                pept_data = json.loads(line)["peptides"]
-                unipept_dict["peptides"].extend(pept_data)
-    else:
-        with open(unipept_response, "r") as file:
-            unipept_dict = json.load(file)
+    with open(unipept_response, "r") as file:
+        unipept_dict = json.load(file)
 
     # Convert a JSON object into a Pandas DataFrame
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
-    unipept_frame = pd.json_normalize(unipept_dict, record_path=["peptides"])
+    unipept_frame = pd.json_normalize(unipept_dict)
     # Merge psm_score and number of psms
     unipept_frame = pd.concat(
         [
@@ -111,9 +77,10 @@ def perform_taxa_weighing(
     # Score the degeneracy of a taxa, i.e.,
     # how conserved a peptide sequence is between taxa.
     # map all taxids in the list in the taxa column back to their taxid at species level (or the rank specified by the user)
+    # TODO: HigherTaxa are probably not even longer required (since these are now always at the rank specified earlier)
     print("Started mapping all taxon ids to the specified rank...")
     unipept_frame["HigherTaxa"] = unipept_frame.apply(
-        lambda row: get_lineage_at_specified_rank(row["taxa"], taxa_rank), axis=1
+        lambda row: row["taxa"], axis=1
     )
 
     # Divide the number of PSMs of a peptide by the number of taxa the peptide is associated with, exponentiated by 3
@@ -148,10 +115,7 @@ def perform_taxa_weighing(
 
     # Retrieves the specified taxonomic rank taxid in the lineage of each of the species-level taxids returned by
     # Unipept for both the UnipeptFrame and the TaxIdWeightFrame
-    if select_rank:
-        # TaxIDWeights['HigherTaxa'] = TaxIDWeights.apply(lambda row: GetLineageAtSpecifiedRank(row['taxa'],TaxaRank), axis = 1)
-        # UnipeptFrame['HigherTaxa'] = UnipeptFrame.apply(lambda row: GetLineageAtSpecifiedRank(row['taxa'],TaxaRank), axis = 1)
-        higher_unique_psm_taxids = unique_psm_taxa  # set([GetLineageAtSpecifiedRank(i,TaxaRank) for i in UniquePSMTaxa])
+    higher_unique_psm_taxids = unique_psm_taxa  # set([GetLineageAtSpecifiedRank(i,TaxaRank) for i in UniquePSMTaxa])
 
     # group the duplicate entries of higher up taxa and sum their weights
     print("Started grouping duplicate entries of taxa situated higher up and sum their weights...")
