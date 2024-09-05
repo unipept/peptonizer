@@ -21,5 +21,5 @@ document.querySelector('#app').innerHTML = `
   </div>
 `
 
-const data = await (await fetch("data/rescored_small.psms.tsv")).text();
+const data = await (await fetch("data/rescored.psms.tsv")).text();
 await peptonize(data);

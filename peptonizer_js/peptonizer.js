@@ -20,62 +20,59 @@ export async function peptonize(psmContent) {
             'networkx',
             'pandas',
             'micropip',
-            'matplotlib',
             'requests',
-            'sqlite3',
-            'aiohttp',
             'openssl'
         ]);
 
-    const data = await (await fetch("data/rescored_small.psms.tsv")).text();
+    const data = await (await fetch("data/rescored.psms.tsv")).text();
     pyodide.globals.set('input', data);
 
     const peptonizerOutput = await pyodide.runPythonAsync(`
         import micropip
-        
+        import json
+
         await micropip.install("lib/peptonizer-0.1-py3-none-any.whl")
-        await micropip.install("aiofiles")
 
         import peptonizer
-       
+
         # The PSM input should be provided to the parser as a list of strings
         psms = [globals().get('input')]
-        
+
         print("Started parsing pout file from MS2Rescore...")
         parsed_input = peptonizer.parse_ms2rescore_output(psms, 0.01)
         print("Input has been parsed successfully...")
-        
+
         print("Started fetching Unipept taxon information...")
         peptonizer.fetch_unipept_taxon_information(
             parsed_input,
-            "file_unipept_peptide_counts",
-            "file_unipept_response",
+            "/mnt/file_unipept_peptide_counts",
+            "/mnt/file_unipept_response",
             "2",
             "species",
-            "file_unipept_taxon_information_log"            
+            "/mnt/file_unipept_taxon_information_log"
         )
         print("Successfully fetched Unipept taxon information...")
-        
+
         print("Started weighing taxa...")
         df, weights = peptonizer.perform_taxa_weighing(
-            "file_unipept_response",
-            "file_unipept_peptide_counts",
+            "/mnt/file_unipept_response",
+            "/mnt/file_unipept_peptide_counts",
             10,
             "species"
         )
-        df.to_csv("file_weights_dataframe")
-        weights.to_csv("taxa_weights")
+        df.to_csv("/mnt/file_weights_dataframe")
+        weights.to_csv("/mnt/taxa_weights")
         print("Successfully weighed taxa...")
-        
+
         print("Start creation of PepGM graph...")
         peptonizer.generate_pepgm_graph(
-            "file_weights_dataframe", 
-            "file_pepgm_graph"
+            "/mnt/file_weights_dataframe",
+            "/mnt/file_pepgm_graph"
         )
         print("Successfully created PepGM graph...")
-        
+
         print("Started running PepGM...")
-        graph_contents = open("file_pepgm_graph", "r").read()
+        graph_contents = open("/mnt/file_pepgm_graph", "r").read()
         pepgm_results = peptonizer.run_belief_propagation(
             graph_contents,
             0.9,
@@ -85,10 +82,14 @@ export async function peptonize(psmContent) {
             25
         )
         print("Successfully executed PepGM...")
-        
-        pepgm_results
+
+        # Now convert the results from PepGM into a list of taxon IDs and the corresponding score values.
+        final_scores = peptonizer.extract_taxon_scores(pepgm_results)
+
+        json.dumps(final_scores)
     `);
 
+    console.log("Final output from the PeptonizerJS: ")
     console.log(peptonizerOutput);
 
     return null;

@@ -8,7 +8,7 @@ class TaxonManager:
     UNIPEPT_URL = "http://api.unipept.ugent.be"
     UNIPEPT_TAXONOMY_ENDPOINT = "/api/v2/taxonomy.json"
 
-    TAXONOMY_ENDPOINT_BATCH_SIZE = 15
+    TAXONOMY_ENDPOINT_BATCH_SIZE = 100
 
     NCBI_RANKS = [
         "superkingdom",
