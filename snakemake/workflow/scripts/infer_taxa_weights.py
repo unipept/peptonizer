@@ -29,6 +29,13 @@ parser.add_argument(
     type=str,
     required=True,
 )
+parser.add_argument(
+    "--taxon-rank",
+    type=str,
+    required=False,
+    default="species",
+    help="Taxonomic rank at which you want the Peptonizer2000 results to be resolved.",
+)
 
 
 args = parser.parse_args()
@@ -36,7 +43,8 @@ args = parser.parse_args()
 df, weights = perform_taxa_weighing(
     args.unipept_response_file,
     args.unipept_peptide_counts,
-    args.number_of_taxa
+    args.number_of_taxa,
+    args.taxon_rank
 )
 
 print("Started dumping produced results to CSV-files...")

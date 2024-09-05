@@ -1,11 +1,16 @@
 import json
+from typing import List
+
 import numpy as np
 import pandas as pd
+
+from .taxon_manager import TaxonManager
 
 
 def get_peptide_count_per_tax_id(proteins_per_taxon):
     """
     Convert tab-separated taxon-protein counts to a dictionary.
+
     Parameters
     ----------
     proteins_per_taxon: str,
@@ -25,12 +30,36 @@ def get_peptide_count_per_tax_id(proteins_per_taxon):
     return protein_counts_per_taxid
 
 
+def get_lineage_at_specified_rank(tax_ids: List[int], taxa_rank: str) -> List[int]:
+    """
+    Returns the taxon ID of the specified rank in the lineage for all taxa ID given as argument.
+
+    For example, given a taxon ID at strain level and "species" as value for the taxa_rank argument, this function
+    will return the taxon ID at species level for the input taxon ID.
+
+    Parameters
+    -----
+    tax_ids: [int]
+         List of taxon_ids to get the lineage of
+    taxa_rank:
+         Rank at which you want to pin the taxa
+    """
+
+    # Get the full lineage for all given taxon IDs from Unipept
+    lineages = TaxonManager.get_lineages_for_taxa(tax_ids)
+
+    # Get the index of the NCBI rank that we're interested in. This index is required to extract the taxon IDs from the
+    # correct place in the lineage.
+    rank_idx = TaxonManager.NCBI_RANKS.index(taxa_rank)
+
+    return [lineages[tax][rank_idx] for tax in tax_ids]
+
+
 def perform_taxa_weighing(
     unipept_response,
     pept_score_dict: str,
     max_tax,
-    *peptides_per_taxon,
-    n=0
+    taxa_rank="species"
 ):
     """
     Weight inferred taxa based on their (1) degeneracy and (2) their proteome size.
@@ -41,11 +70,9 @@ def perform_taxa_weighing(
     pept_score_dict: str
         Dictionary that contains peptide to score & number of PSMs map
     max_tax: int
-        Maximum number of taxons to include in the graphical model
-    peptides_per_taxon: str
-        Path to the file that contains the size of the proteome per taxID (tab-separated)
-    n: int
-        tbd
+        Maximum number of taxa to include in the graphical model
+    taxa_rank: str
+        NCBI rank at which the Peptonizer analysis should be performed
 
     Returns
     -------
@@ -80,7 +107,7 @@ def perform_taxa_weighing(
     # TODO: HigherTaxa are probably not even longer required (since these are now always at the rank specified earlier)
     print("Started mapping all taxon ids to the specified rank...")
     unipept_frame["HigherTaxa"] = unipept_frame.apply(
-        lambda row: row["taxa"], axis=1
+        lambda row: get_lineage_at_specified_rank(row["taxa"], taxa_rank), axis=1
     )
 
     # Divide the number of PSMs of a peptide by the number of taxa the peptide is associated with, exponentiated by 3
@@ -96,15 +123,6 @@ def perform_taxa_weighing(
     print("Started summing the weights of a taxon and sorting them by weight...")
     unipept_frame["log_weight"] = np.log10(unipept_frame["weight"] + 1)
     tax_id_weights = unipept_frame.groupby("HigherTaxa")["log_weight"].sum().reset_index()
-    # Retrieve the proteome size per taxid as a dictionary
-    # This file was previously prepared by filtering a generic accession 2 taxid mapping file
-    # to swissprot (i.e., reviewed) proteins only
-
-    # Peptidome size: optional to include a weighting based on the size of the proteome, this didn't prove effective so
-    # disabled for now.
-    # PeptidomeSize: GetPeptideCountPerTaxID(PeptidesPerTaxon)
-    # Map peptidome size and remove NAs
-    # TaxIDWeights: TaxIDWeights[TaxIDWeights['taxa'].isin(PeptidomeSize.keys())].assign(proteome_size=lambda x: x['taxa'].map(PeptidomeSize))
 
     # Since large proteomes tend to have more detectable peptides,
     # we adjust the weight by dividing by the size of the proteome i.e.,

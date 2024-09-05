@@ -28,4 +28,4 @@ parser.add_argument(
 )
 
 args = parser.parse_args()
-plot_peptonizer_results(args.results_file, args.result_file.replace(".csv", ".png"), args.number_of_results)
+plot_peptonizer_results(args.results_file, args.results_file.replace(".csv", ".png"), args.number_of_results)

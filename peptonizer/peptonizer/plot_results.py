@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from ete3 import NCBITaxa
+from .taxon_manager import TaxonManager
 
 
 def plot_peptonizer_results(input_file: str, output_file: str, number_of_taxa: int = 25):
@@ -13,7 +13,6 @@ def plot_peptonizer_results(input_file: str, output_file: str, number_of_taxa: i
     assert input_file.lower().endswith(".csv"), "Input file should be a CSV."
     assert output_file.lower().endswith(".png"), "Output file should be a PNG."
 
-    ncbi = NCBITaxa()
 
     # read csv using pandas
     ids = pd.read_csv(input_file, names=["ID", "score", "type"])
@@ -25,7 +24,7 @@ def plot_peptonizer_results(input_file: str, output_file: str, number_of_taxa: i
     taxa_check = tax_ids.ID.tolist()
 
     # translate taxids to scientific names
-    taxa_name_dict = ncbi.get_taxid_translator(tax_ids["ID"])
+    taxa_name_dict = TaxonManager.get_names_for_taxa([int(x) for x in tax_ids["ID"]])
     taxa_names = [taxa_name_dict[int(tax)] for tax in taxa_check]
     scores = tax_ids["score"]
 

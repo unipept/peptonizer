@@ -34,7 +34,6 @@ export async function peptonize(psmContent) {
         import micropip
         
         await micropip.install("lib/peptonizer-0.1-py3-none-any.whl")
-        await micropip.install("lib/ete3-3.1.3-py310-none-any.whl")
         await micropip.install("aiofiles")
 
         import peptonizer
@@ -44,10 +43,50 @@ export async function peptonize(psmContent) {
         
         print("Started parsing pout file from MS2Rescore...")
         parsed_input = peptonizer.parse_ms2rescore_output(psms, 0.01)
+        print("Input has been parsed successfully...")
         
-        print()
+        print("Started fetching Unipept taxon information...")
+        peptonizer.fetch_unipept_taxon_information(
+            parsed_input,
+            "file_unipept_peptide_counts",
+            "file_unipept_response",
+            "2",
+            "species",
+            "file_unipept_taxon_information_log"            
+        )
+        print("Successfully fetched Unipept taxon information...")
         
-        #peptonizer.pepgm.run_pepgm(graph_content, 0.9, 0.6, True, 0.5, 10000, 0.3)
+        print("Started weighing taxa...")
+        df, weights = peptonizer.perform_taxa_weighing(
+            "file_unipept_response",
+            "file_unipept_peptide_counts",
+            10,
+            "species"
+        )
+        df.to_csv("file_weights_dataframe")
+        weights.to_csv("taxa_weights")
+        print("Successfully weighed taxa...")
+        
+        print("Start creation of PepGM graph...")
+        peptonizer.generate_pepgm_graph(
+            "file_weights_dataframe", 
+            "file_pepgm_graph"
+        )
+        print("Successfully created PepGM graph...")
+        
+        print("Started running PepGM...")
+        graph_contents = open("file_pepgm_graph", "r").read()
+        pepgm_results = peptonizer.run_belief_propagation(
+            graph_contents,
+            0.9,
+            0.6,
+            0.5,
+            10000,
+            25
+        )
+        print("Successfully executed PepGM...")
+        
+        pepgm_results
     `);
 
     console.log(peptonizerOutput);

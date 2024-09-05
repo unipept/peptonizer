@@ -481,7 +481,7 @@ def calibrate_all_subgraphs(list_of_ct_factor_graphs: List[CTFactorGraph], max_i
     return results_dict, node_category_dict
 
 
-def save_results_to_csv(results_dict: Dict[str, npt.NDArray[np.float64]], node_dict: Dict[str, str], name_string: str):
+def convert_results_to_csv(results_dict: Dict[str, npt.NDArray[np.float64]], node_dict: Dict[str, str]):
     """
     Save Loopy Belief Propagation results to .csv file
     :param results_dict: dict, {variable:posterior_probability}
@@ -525,5 +525,4 @@ def run_belief_propagation(
         ct_factor_graphs, max_iter, tol
     )
 
-    return save_results_to_csv(results_dict, node_types)
-
+    return convert_results_to_csv(results_dict, node_types)
