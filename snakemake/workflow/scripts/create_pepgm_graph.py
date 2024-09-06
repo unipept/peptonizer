@@ -1,4 +1,5 @@
 import argparse
+import pandas as pd
 
 from peptonizer.peptonizer import generate_pepgm_graph
 
@@ -8,10 +9,10 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument(
-    "--graph-data-frame",
+    "--taxa-weights-dataframe-file",
     type=str,
     required=True,
-    help="Path to where you want to save the GraphML file of the factor graph.",
+    help="Dataframe file containing the taxa weights that have been computed before.",
 )
 parser.add_argument(
     "--out",
@@ -22,4 +23,5 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-generate_pepgm_graph(args.graph_data_frame, args.out)
+ct_factor_graph = generate_pepgm_graph(pd.read_csv(args.taxa_weights_dataframe_file))
+ct_factor_graph.save_to_graph_ml(args.out)

@@ -53,20 +53,16 @@ export async function peptonize(psmContent) {
         print("Successfully fetched Unipept taxon information...")
 
         print("Started weighing taxa...")
-        df, weights = peptonizer.perform_taxa_weighing(
+        taxa_weights_df, _ = peptonizer.perform_taxa_weighing(
             unipept_responses,
             parsed_input,
             10,
             "species"
         )
-        df.to_csv("file_weights_dataframe")
         print("Successfully weighed taxa...")
 
         print("Start creation of PepGM graph...")
-        peptonizer.generate_pepgm_graph(
-            "file_weights_dataframe",
-            "file_pepgm_graph"
-        )
+        pepgm_graph = peptonizer.generate_pepgm_graph(taxa_weights_df)
         print("Successfully created PepGM graph...")
         
         def sizeof_fmt(num, suffix='B'):
@@ -80,10 +76,26 @@ export async function peptonize(psmContent) {
                                   locals().items())), key= lambda x: -x[1])[:10]:
             print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
 
+        print("Freeing up memory...")        
+        del taxa_weights_df
+        del unipept_responses
+        del parsed_input
+        del input
+        
+        def sizeof_fmt(num, suffix='B'):
+            for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+                if abs(num) < 1024.0:
+                    return "%3.1f %s%s" % (num, unit, suffix)
+                num /= 1024.0
+            return "%.1f %s%s" % (num, 'Yi', suffix)
+        
+        for name, size in sorted(((name, getsizeof(value)) for name, value in list(
+                                  locals().items())), key= lambda x: -x[1])[:10]:
+            print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
+        
         print("Started running PepGM...")
-        graph_contents = open("file_pepgm_graph", "r").read()
         pepgm_results = peptonizer.run_belief_propagation(
-            graph_contents,
+            pepgm_graph,
             0.9,
             0.6,
             0.5,

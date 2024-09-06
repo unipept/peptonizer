@@ -75,7 +75,7 @@ rule CreatePepGMGraph:
     shell:
         """
         export PYTHONPATH={project_root}:${{PYTHONPATH:-}}
-        {params.run_command} scripts/create_pepgm_graph.py --graph-data-frame {input[0]} --out {output[0]}
+        {params.run_command} scripts/create_pepgm_graph.py --taxa-weights-dataframe-file {input[0]} --out {output[0]}
         """
 
 rule RunPepGM:

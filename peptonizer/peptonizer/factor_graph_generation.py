@@ -1,3 +1,5 @@
+from typing import List, Any
+
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -14,26 +16,25 @@ class TaxonGraph(nx.Graph):
         super().__init__()
         self.taxon_id_list = []
 
-    def create_from_unipept_response_csv(self, csv_path):
-        unipept_response = pd.read_csv(csv_path)
+    def create_from_taxa_weights(self, taxa_weights):
         # drop rows that have an entry in HigherTaxa that appears only once
-        counts = unipept_response["HigherTaxa"].value_counts()
-        unipept_response = unipept_response[
-            unipept_response["HigherTaxa"].isin(counts[counts > 1].index)
+        counts = taxa_weights["HigherTaxa"].value_counts()
+        taxa_weights = taxa_weights[
+            taxa_weights["HigherTaxa"].isin(counts[counts > 1].index)
         ]
-        new_graph = nx.from_pandas_edgelist(unipept_response, "sequence", "HigherTaxa")
-        peptide_attributes = unipept_response.apply(
+        new_graph = nx.from_pandas_edgelist(taxa_weights, "sequence", "HigherTaxa")
+        peptide_attributes = taxa_weights.apply(
             lambda row: (
                 row["sequence"],
                 {
-                    "InitialBelief_0": row["score"],
-                    "InitialBelief_1": 1 - row["score"],
+                    "InitialBelief_0": float(row["score"]),
+                    "InitialBelief_1": 1 - float(row["score"]),
                     "category": "peptide",
                 },
             ),
             axis=1,
         )
-        taxa_attributes = unipept_response.apply(
+        taxa_attributes = taxa_weights.apply(
             lambda row: (row["HigherTaxa"], {"category": "taxon"}), axis=1
         )
         intermediate_graph = nx.Graph()
@@ -269,12 +270,10 @@ def generate_ct_factor_graphs(list_of_factor_graphs, graph_type="Taxons"):
 
 
 def generate_pepgm_graph(
-    graph_data_frame_file: str,
-    graph_ml_output_file: str
-):
+    taxa_weights_data_frame: pd.DataFrame
+) -> CTFactorGraph:
     taxon_graph = TaxonGraph()
-    taxon_graph.create_from_unipept_response_csv(graph_data_frame_file)
+    taxon_graph.create_from_taxa_weights(taxa_weights_data_frame)
     factor_graph = FactorGraph()
     factor_graph.construct_from_existing_graph(taxon_graph)
-    ct_factor_graph = generate_ct_factor_graphs(factor_graph)
-    ct_factor_graph.save_to_graph_ml(graph_ml_output_file)
+    return generate_ct_factor_graphs(factor_graph)
