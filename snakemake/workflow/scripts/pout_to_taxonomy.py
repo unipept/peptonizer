@@ -1,17 +1,12 @@
 import argparse
 import gzip
+import json
 
-from peptonizer.peptonizer import parse_pout, parse_ms2rescore_output, fetch_unipept_taxon_information
+from peptonizer.peptonizer import parse_ms2rescore_output, fetch_unipept_taxon_information
 
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument(
-    "--unipept-response-file",
-    type=str,
-    required=True,
-    help="Output: path to Unipept response .json file",
-)
 parser.add_argument(
     "--taxonomy-query",
     required=True,
@@ -26,12 +21,11 @@ parser.add_argument(
 parser.add_argument(
     "--pout-file",
     type=str,
-    nargs="+",
     required=True,
-    help="Input: paths to percolator (ms2rescore) '.pout' files.",
+    help="Input: path to percolator (ms2rescore) '.pout' file.",
 )
 parser.add_argument(
-    "--unipept-peptide-counts",
+    "--unipept-response-file",
     type=str,
     required=True,
     help="Path to output file that contains all queried peptide counts (which should be used in the next step)."
@@ -52,18 +46,19 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-for path in args.pout_file:
-    file_contents = []
-    with gzip.open(path, 'rt', encoding='utf-8') as file:
-        file_contents.append(file.read())
+file_contents = []
+with gzip.open(args.pout_file, 'rt', encoding='utf-8') as file:
+    file_contents.append(file.read())
 
-    pep_score_psm = parse_ms2rescore_output(file_contents, args.fdr)
+# Parse the input MS2Rescore file
+pep_score_psm = parse_ms2rescore_output(file_contents, args.fdr)
 
-    fetch_unipept_taxon_information(
-        pep_score_psm,
-        args.unipept_peptide_counts,
-        args.unipept_response_file,
-        args.taxonomy_query,
-        args.taxon_rank,
-        args.log_file
-    )
+unipept_response = fetch_unipept_taxon_information(
+    pep_score_psm,
+    args.taxonomy_query,
+    args.taxon_rank,
+    args.log_file
+)
+
+with open(args.unipept_response_file, "w") as f:
+    f.write(json.dumps(unipept_response))

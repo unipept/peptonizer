@@ -1,31 +1,25 @@
 import argparse
+import gzip
+import json
 
-from peptonizer.peptonizer import perform_taxa_weighing
-
+from peptonizer.peptonizer import perform_taxa_weighing, parse_ms2rescore_output
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument(
-    "--unipept-response-file",
-    type=str,
-    required=True,
-    help="Input: path to a Unipept response '.json' file that's been produced earlier in the pipeline.",
-)
 parser.add_argument(
     "--number-of-taxa",
     type=int,
     required=True,
     help="Number of taxa to include in the final Peptonizer2000 output.",
 )
-parser.add_argument("--out", type=str, required=True, help="path to csv out file")
 parser.add_argument(
-    "--taxa-weight-file",
+    "--taxa-weights-dataframe-file",
     type=str,
     required=False,
     help="Output: path to a CSV-file that will contain all computed taxa weights.",
 )
 parser.add_argument(
-    "--unipept-peptide-counts",
+    "--unipept-response-file",
     type=str,
     required=True,
 )
@@ -36,17 +30,39 @@ parser.add_argument(
     default="species",
     help="Taxonomic rank at which you want the Peptonizer2000 results to be resolved.",
 )
+parser.add_argument(
+    "--pout-file",
+    type=str,
+    required=True,
+    help="Input: path to percolator (ms2rescore) '.pout' file.",
+)
+parser.add_argument(
+    "--fdr",
+    type=float,
+    required=True,
+    help="Min peptide score for the peptide to be included in the search.",
+)
 
 
 args = parser.parse_args()
 
+file_contents = []
+with gzip.open(args.pout_file, 'rt', encoding='utf-8') as file:
+    file_contents.append(file.read())
+
+# Parse the input MS2Rescore file
+pep_score_psm = parse_ms2rescore_output(file_contents, args.fdr)
+
+# Parse the Unipept response file
+with open(args.unipept_response_file, "r") as file:
+    unipept_responses = json.load(file)
+
 df, weights = perform_taxa_weighing(
-    args.unipept_response_file,
-    args.unipept_peptide_counts,
+    unipept_responses,
+    pep_score_psm,
     args.number_of_taxa,
     args.taxon_rank
 )
 
 print("Started dumping produced results to CSV-files...")
-df.to_csv(args.out)
-weights.to_csv(args.taxa_weight_file)
+df.to_csv(args.taxa_weights_dataframe_file)

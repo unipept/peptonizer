@@ -1,12 +1,11 @@
 import requests
-import json
 import logging
 
 from typing import Dict, Tuple, List, Any
 
 from .taxon_manager import TaxonManager
 
-UNIPEPT_URL = "http://rick.ugent.be"
+UNIPEPT_URL = "https://api.unipept.ugent.be"
 UNIPEPT_PEPT2FILTERED_ENDPOINT = "/mpa/pept2filtered.json"
 
 UNIPEPT_PEPTIDES_BATCH_SIZE = 500
@@ -61,30 +60,14 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
 
 
 def fetch_unipept_taxon_information(
-    pep_score_psm: Dict[str, Tuple[float, int]],
-    unipept_peptide_counts_file: str,
-    unipept_response_file: str,
+    peptide_scores: Dict[str, Dict[str, float | int]],
     taxonomy_query: str,
     rank: str,
     log_file: str
-):
-    unipept_peptides = dict()
-
-    for pep in pep_score_psm.keys():
-        unipept_peptides[pep] = {
-            "score": pep_score_psm[pep][0],
-            "psms": pep_score_psm[pep][1],
-        }
-
-    with open(unipept_peptide_counts_file, "a") as f_out:
-        f_out.write(json.dumps(unipept_peptides))
-
+) -> List[Any]:
     # Set up the logger such that we can write errors to the provided file
     logging.basicConfig(filename=log_file, level=logging.INFO)
 
     taxa_filter = TaxonManager.get_descendants_for_taxa([int(item) for item in taxonomy_query.split(",")], rank)
-    unipept_responses = query_unipept_and_filter_taxa(list(unipept_peptides.keys()), taxa_filter)
-
-    with open(unipept_response_file, "w") as f_out:
-        json.dump(unipept_responses, f_out)
+    return query_unipept_and_filter_taxa(list(peptide_scores.keys()), taxa_filter)
 

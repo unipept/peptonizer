@@ -1,5 +1,5 @@
 import json
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 import pandas as pd
@@ -56,23 +56,24 @@ def get_lineage_at_specified_rank(tax_ids: List[int], taxa_rank: str) -> List[in
 
 
 def perform_taxa_weighing(
-    unipept_response,
-    pept_score_dict: str,
-    max_tax,
+    unipept_counts: List[any],
+    pept_scores: Dict[str, Dict[str, float | int]],
+    max_taxa,
     taxa_rank="species"
 ):
     """
     Weight inferred taxa based on their (1) degeneracy and (2) their proteome size.
     Parameters
     ----------
-    unipept_response: str
-        Path to Unipept response json file
-    pept_score_dict: str
-        Dictionary that contains peptide to score & number of PSMs map
-    max_tax: int
-        Maximum number of taxa to include in the graphical model
+    unipept_counts: List[any]
+        Peptide counts that have already been processed by Unipept before.
+    pept_scores: Dict[str, Dict[str, float | int]]
+        Dictionary that maps each peptide string onto an object containing the score associated to this peptide and the
+        psm count.
+    max_taxa: int
+        Maximum number of taxa to include in the final graphical model.
     taxa_rank: str
-        NCBI rank at which the Peptonizer analysis should be performed
+        NCBI rank at which the Peptonizer analysis should be performed.
 
     Returns
     -------
@@ -82,21 +83,15 @@ def perform_taxa_weighing(
     """
     print("Parsing Unipept responses from disk...")
 
-    with open(pept_score_dict, "r") as file:
-        pept_score_dict_loaded = json.load(file)
-
-    with open(unipept_response, "r") as file:
-        unipept_dict = json.load(file)
-
     # Convert a JSON object into a Pandas DataFrame
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
-    unipept_frame = pd.json_normalize(unipept_dict)
+    unipept_frame = pd.json_normalize(unipept_counts)
     # Merge psm_score and number of psms
     unipept_frame = pd.concat(
         [
             unipept_frame,
-            pd.json_normalize(unipept_frame["sequence"].map(pept_score_dict_loaded)),
+            pd.json_normalize(unipept_frame["sequence"].map(pept_scores)),
         ],
         axis=1,
     )
@@ -104,7 +99,6 @@ def perform_taxa_weighing(
     # Score the degeneracy of a taxa, i.e.,
     # how conserved a peptide sequence is between taxa.
     # map all taxids in the list in the taxa column back to their taxid at species level (or the rank specified by the user)
-    # TODO: HigherTaxa are probably not even longer required (since these are now always at the rank specified earlier)
     print("Started mapping all taxon ids to the specified rank...")
     unipept_frame["HigherTaxa"] = unipept_frame.apply(
         lambda row: get_lineage_at_specified_rank(row["taxa"], taxa_rank), axis=1
@@ -158,7 +152,7 @@ def perform_taxa_weighing(
     if len(higher_taxid_weights.HigherTaxa) < 50:
         return unipept_frame, higher_taxid_weights
     else:
-        taxa_to_include = set(higher_taxid_weights["HigherTaxa"][0:max_tax])
+        taxa_to_include = set(higher_taxid_weights["HigherTaxa"][0:max_taxa])
         taxa_to_include.update(higher_unique_psm_taxids)
         return (
             unipept_frame[unipept_frame["HigherTaxa"].isin(taxa_to_include)],

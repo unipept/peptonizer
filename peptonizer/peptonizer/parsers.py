@@ -3,7 +3,7 @@ import re
 from typing import Dict, Tuple, List
 
 
-def parse_pout(pout_files: List[str], fdr_threshold: float) -> Dict[str, Tuple[float, int]]:
+def parse_pout(pout_files: List[str], fdr_threshold: float) -> Dict[str, Dict[str, float | int]]:
     """
       Parses the ms2rescore pout file for peptides, psm numbers and peptide scores.
 
@@ -53,11 +53,16 @@ def parse_pout(pout_files: List[str], fdr_threshold: float) -> Dict[str, Tuple[f
                         pep_score[peptide] = "0.001"
                     else:
                         pep_score[peptide] = min(pep, pep_score[peptide])
-                pep_score_psm[peptide] = [pep_score[peptide], len(pep_psm[peptide])]
+
+                pep_score_psm[peptide] = {
+                    "score": pep_score[peptide],
+                    "psms": len(pep_psm[peptide])
+                }
+
     return pep_score_psm
 
 
-def parse_ms2rescore_output(pout_files: List[str], fdr_threshold: float) -> Dict[str, Tuple[float, int]]:
+def parse_ms2rescore_output(pout_files: List[str], fdr_threshold: float) -> Dict[str, Dict[str, float | int]]:
     """
     Parses the ms2rescore pout file for peptides, psm numbers and peptide scores
     :param pout_files: str, content of pout files that need to be parsed.
@@ -103,6 +108,9 @@ def parse_ms2rescore_output(pout_files: List[str], fdr_threshold: float) -> Dict
                         pep_score[peptide] = "0.001"
                     else:
                         pep_score[peptide] = min(pep, pep_score[peptide])
-                pep_score_psm[peptide] = [pep_score[peptide], len(pep_psm[peptide])]
+                pep_score_psm[peptide] = {
+                    "score": pep_score[peptide],
+                    "psms": len(pep_psm[peptide])
+                }
 
     return pep_score_psm

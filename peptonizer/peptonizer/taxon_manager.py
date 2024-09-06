@@ -2,6 +2,7 @@ import logging
 import requests
 
 from typing import List, Dict
+from sys import getsizeof
 
 
 class TaxonManager:
