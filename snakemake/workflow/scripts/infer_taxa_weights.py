@@ -46,9 +46,9 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-file_contents = []
+
 with gzip.open(args.pout_file, 'rt', encoding='utf-8') as file:
-    file_contents.append(file.read())
+    file_contents = file.read()
 
 # Parse the input MS2Rescore file
 pep_score_psm = parse_ms2rescore_output(file_contents, args.fdr)

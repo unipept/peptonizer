@@ -56,7 +56,7 @@ def get_lineage_at_specified_rank(tax_ids: List[int], taxa_rank: str) -> List[in
 
 
 def perform_taxa_weighing(
-    unipept_counts: List[any],
+    unipept_responses: List[any],
     pept_scores: Dict[str, Dict[str, float | int]],
     max_taxa,
     taxa_rank="species"
@@ -65,7 +65,7 @@ def perform_taxa_weighing(
     Weight inferred taxa based on their (1) degeneracy and (2) their proteome size.
     Parameters
     ----------
-    unipept_counts: List[any]
+    unipept_responses: List[any]
         Peptide counts that have already been processed by Unipept before.
     pept_scores: Dict[str, Dict[str, float | int]]
         Dictionary that maps each peptide string onto an object containing the score associated to this peptide and the
@@ -86,7 +86,7 @@ def perform_taxa_weighing(
     # Convert a JSON object into a Pandas DataFrame
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
-    unipept_frame = pd.json_normalize(unipept_counts)
+    unipept_frame = pd.json_normalize(unipept_responses)
     # Merge psm_score and number of psms
     unipept_frame = pd.concat(
         [

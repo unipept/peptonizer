@@ -10,8 +10,11 @@ document.querySelector('#app').innerHTML = `
       <img src="${javascriptLogo}" class="logo vanilla" alt="JavaScript logo" />
     </a>
     <h1>Peptonizer2000</h1>
+    <h2>Results</h2>
+    <div id="data-result">Processing...</div>
   </div>
 `
 
 const data = await (await fetch("data/rescored.psms.tsv")).text();
-await peptonize(data);
+const result = await peptonize(data);
+document.getElementById("data-result").textContent = result;

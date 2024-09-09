@@ -24,7 +24,7 @@ export async function peptonize(psmContent) {
             'openssl'
         ]);
 
-    const data = await (await fetch("data/rescored.psms.tsv")).text();
+    const data = await (await fetch("data/rescored_medium.psms.tsv")).text();
     pyodide.globals.set('input', data);
 
     const peptonizerOutput = await pyodide.runPythonAsync(`
@@ -98,9 +98,8 @@ export async function peptonize(psmContent) {
             pepgm_graph,
             0.9,
             0.6,
-            0.5,
-            10000,
-            25
+            True,
+            0.5
         )
         print("Successfully executed PepGM...")
 
@@ -113,6 +112,6 @@ export async function peptonize(psmContent) {
     console.log("Final output from the PeptonizerJS: ")
     console.log(peptonizerOutput);
 
-    return null;
+    return peptonizerOutput;
 }
 
