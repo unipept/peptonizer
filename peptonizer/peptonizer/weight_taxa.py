@@ -149,6 +149,10 @@ def perform_taxa_weighing(
     except:
         pass
 
+    unipept_frame = unipept_frame.drop('taxa', axis=1)
+    # Also get rid of duplicate rows.
+    unipept_frame.drop_duplicates(inplace=True)
+
     if len(higher_taxid_weights.HigherTaxa) < 50:
         return unipept_frame, higher_taxid_weights
     else:

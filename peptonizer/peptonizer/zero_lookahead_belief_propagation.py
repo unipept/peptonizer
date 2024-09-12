@@ -1,6 +1,7 @@
 # implementation of belief propagation on a peptide-protein graph
 # __________________________________________________________________________________________
 import time
+from sys import getsizeof
 
 from .convolution_tree import *
 from .factor_graph_generation import *
@@ -353,7 +354,7 @@ class Messages:
         max_residual = 100
 
         # first, do 5 loops where I update all messages
-        print(f"Time spent in loop 0/{max_loops}: 0s", end="")
+        print(f"Time spent in loop 0/{max_loops}: 0s")
         for k in range(0, 5):
             start_t = time.time()
             self.compute_update()
@@ -361,7 +362,7 @@ class Messages:
             self.msg.update(self.msg_new)
             k += 1
             end_t = time.time()
-            print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s", end="")
+            print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s")
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
         for edge in self.edges:
@@ -375,6 +376,9 @@ class Messages:
                 for end2 in self.neighbours[end_node]:
                     self.total_residuals[((start_node, end_node), (end_node, end2))] = 0
                     self.total_residuals[((end2, end_node), (end_node, start_node))] = 0
+
+            if len(self.total_residuals) % 1000 < 5:
+                print(f"Total residuals length: {len(self.total_residuals)}, size in bytes: {getsizeof(self.total_residuals)}")
 
         # set the priority vector once with copy of the previously calculated residuals
         self.priorities = pqdict(self.full_residuals.copy(), reverse=True)
