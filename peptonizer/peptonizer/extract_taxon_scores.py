@@ -3,6 +3,8 @@ import pandas as pd
 from typing import Dict
 from io import StringIO
 
+from .taxon_manager import TaxonManager
+
 
 def extract_taxon_scores(csv_content: str) -> Dict[int, float]:
     """
@@ -27,8 +29,10 @@ def extract_taxon_scores(csv_content: str) -> Dict[int, float]:
 
     taxon_score_dict = dict()
 
+    name_mapping = TaxonManager.get_names_for_taxa([int(id) for id in tax_ids["ID"]])
+
     for (idx, tax_id) in enumerate(tax_ids["ID"]):
-        taxon_score_dict[tax_id] = scores[idx]
+        taxon_score_dict[name_mapping[int(tax_id)]] = scores[idx]
 
     return taxon_score_dict
 
