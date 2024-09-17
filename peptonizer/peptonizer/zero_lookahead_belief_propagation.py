@@ -30,7 +30,6 @@ class Messages:
         self.max_val: Optional[Tuple[int, int]] = None
         self.priorities: pqdict = pqdict({}, reverse=True)
         self.category: Category = Category[ct_graph_in.category]
-        print(getsizeof(self.category))
 
         # Maps a node identifier (as specified by the CTGraph) onto a unique integer.
         self.node_descriptions: Dict[str, int] = {}
@@ -55,9 +54,9 @@ class Messages:
         # Maps a node ID onto its current belief value
         self.current_beliefs: List[npt.NDArray[np.float64]] = []
 
-        self.msg: Dict[int, npt.NDArray[np.float64]] = {}
-        self.msg_new: Dict[int, npt.NDArray[np.float64]] = {}
-        self.msg_log: Dict[int, npt.NDArray[np.float64]] = {}
+        self.msg: List[npt.NDArray[np.float64]] = []
+        self.msg_new: List[npt.NDArray[np.float64]] = []
+        self.msg_log: List[npt.NDArray[np.float64]] = []
 
         nodes: Iterator[Tuple[Any, Dict[str, Any]]] = ct_graph_in.nodes(data=True)
 
@@ -91,8 +90,11 @@ class Messages:
             self.neighbours.append([self.node_descriptions[n] for n in ct_graph_in.neighbors(node[0])])
 
         # Now, also replace the edge descriptions by the corresponding node IDs
+        graph_edges = ct_graph_in.edges(data=True)
+        self.msg = [np.empty for _ in range(2 * len(graph_edges))]
+        self.msg_new = [np.empty for _ in range(2 * len(graph_edges))]
         edge_id: int = 0
-        for start_node, end_node, data in ct_graph_in.edges(data=True):
+        for start_node, end_node, data in graph_edges:
             start_node_id = self.node_descriptions[start_node]
             end_node_id = self.node_descriptions[end_node]
 
@@ -372,8 +374,8 @@ class Messages:
         for k in range(0, 5):
             start_t = time.time()
             self.compute_update()
-            self.msg_log.update(self.msg)
-            self.msg.update(self.msg_new)
+            self.msg_log = self.msg.copy()
+            self.msg = self.msg_new.copy()
             k += 1
             end_t = time.time()
             print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s")
@@ -397,8 +399,8 @@ class Messages:
 
             self.single_edge_direction_update(priority_message_edge_id, checked_cts)
             priority_residual = self.compute_infinity_norm_residual(priority_message_edge_id)
-            self.msg_log.update(self.msg)
-            self.msg.update(self.msg_new)
+            self.msg_log = self.msg.copy()
+            self.msg = self.msg_new.copy()
             self.compute_total_residuals(
                 priority_message_edge_id, priority_residual
             )
