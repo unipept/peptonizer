@@ -119,7 +119,7 @@ class Messages:
         self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
         self.msg_log = self.msg_new.copy()
 
-    # variables (peptides,proteins,taxa)
+    # variables (peptides, proteins, taxa)
     def get_incoming_message_variable(self, edge_id: int) -> npt.NDArray[np.float64]:
         return self.msg[edge_id]
 
@@ -282,8 +282,8 @@ class Messages:
         msg1 = self.msg[edge_id]
         msg2 = self.msg_log[edge_id]
 
-        if len(self.msg_log[edge_id]) != len(self.msg[edge_id]):
-            msg2 = [1] * len(self.msg[edge_id])
+        if len(msg2) != len(msg1):
+            msg2 = [1] * len(msg1)
 
         pos = 0
         for i in msg1:
