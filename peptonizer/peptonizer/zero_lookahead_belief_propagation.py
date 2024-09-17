@@ -1,12 +1,21 @@
 # implementation of belief propagation on a peptide-protein graph
 # __________________________________________________________________________________________
 import time
+from enum import Enum
 from sys import getsizeof
+
+from dockerpty import start
 
 from .convolution_tree import *
 from .factor_graph_generation import *
 from .pqdict import pqdict
 from typing import Dict, Any, List, Tuple, Iterator
+
+class Category(Enum):
+    peptide = 1
+    factor = 2
+    convolution_tree = 3
+    taxon = 4
 
 
 class Messages:
@@ -20,14 +29,15 @@ class Messages:
         # TODO check if I truly need all three of msg new, msglog and msg.
         self.max_val: Optional[Tuple[int, int]] = None
         self.priorities: pqdict = pqdict({}, reverse=True)
-        self.category: str = ct_graph_in.category
+        self.category: Category = Category[ct_graph_in.category]
+        print(getsizeof(self.category))
 
         # Maps a node identifier (as specified by the CTGraph) onto a unique integer.
         self.node_descriptions: Dict[str, int] = {}
         # Reverse mapping of the dict above
         self.node_id_to_description: List[str] = []
         # Maps a node ID onto its category
-        self.categories: List[str] = []
+        self.categories: List[Category] = []
         # Maps a node ID onto a list of its neighbouring node IDs
         self.neighbours: List[List[int]] = []
         # Keeps track of the number of parents of a node
@@ -37,10 +47,8 @@ class Messages:
         # Reverse mapping of the dict above
         self.edges: List[Tuple[int, int]] = []
 
-        # Keeps track of residuals for edges in the graph
-        self.full_residuals: Dict[int, float] = {}
-        # Keeps track of residuals for edge tuples (edge_id, edge_id) in the graph
-        self.total_residuals: Dict[Tuple[int, int], float] = {}
+        # Keeps track of residuals for duos of edges, indexed by [edge index][neighbour index of edge's end node]
+        self.total_residuals: List[List[float]] = []
 
         # Maps a node ID onto its initial belief value
         self.initial_beliefs: List[npt.NDArray[np.float64]] = []
@@ -59,7 +67,7 @@ class Messages:
 
             self.node_descriptions[node[0]] = node_id
             self.node_id_to_description.append(node[0])
-            self.categories.append(node[1]["category"])
+            self.categories.append(Category[node[1]["category"]])
 
             # Only convolution trees have a number of parents property assigned to them.
             if node[1]["category"] == "convolution_tree":
@@ -106,6 +114,7 @@ class Messages:
 
             edge_id += 2
 
+        self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
         self.msg_log = self.msg_new.copy()
 
     # variables (peptides,proteins,taxa)
@@ -163,7 +172,7 @@ class Messages:
                         self.get_incoming_message_factor(edge_id)
                     )
 
-        if self.categories[node_in] == "convolution_tree":
+        if self.categories[node_in] == Category.convolution_tree:
             # handles empty & messages with only one value
             incoming_messages.append(np.asarray([1.0, 1.0]))
             in_messages_array: npt.NDArray[np.float64] = np.asarray(incoming_messages).reshape(
@@ -218,7 +227,7 @@ class Messages:
 
         for node_in in self.neighbours[node]:
             edge_id: int = self.edge_ids[(node_in, node)]
-            if self.categories[node_in] != "factor":
+            if self.categories[node_in] != Category.factor:
                 prot_prob_list.append(self.msg[edge_id])
                 old_prot_prob_list.append(self.msg_log[edge_id])
                 prot_list.append(node_in)
@@ -283,57 +292,48 @@ class Messages:
         return np.max(np.abs(np.log(np.divide(msg1, msg2))))
         # approximate residual with zero look-ahead
 
-    def compute_zero_look_ahead_residual(self, start_node: int, end_node: int) -> float:
-        node_in_neighbours = [nodes for nodes in self.neighbours[start_node]]
-        node_in_neighbours.remove(end_node)
-        return sum(
-            [self.full_residuals[self.edge_ids[(neighbour, start_node)]] for neighbour in node_in_neighbours]
-        )
-
-    def compute_total_residuals(self, start_node: int, end_node: int, current_residual: float):
-        edge_id: int = self.edge_ids[(start_node, end_node)]
+    def compute_total_residuals(self, edge_id: int, current_residual: float):
+        start_node, end_node = self.edges[edge_id]
+        end_node_neighbor_id: int = self.neighbours[start_node].index(end_node)
         for start_neighbour in self.neighbours[start_node]:
             if start_neighbour != end_node:
-                self.total_residuals[
-                    (self.edge_ids[(start_neighbour, start_node)],
-                     edge_id)
-                ] = 0
+                self.total_residuals[self.edge_ids[(start_neighbour, start_node)]][end_node_neighbor_id] = 0
 
-        for end_neighbour in self.neighbours[end_node]:
+        for i, end_neighbour in enumerate(self.neighbours[end_node]):
             if end_neighbour != start_node:
-                neighbour_edge: int = self.edge_ids[(end_node, end_neighbour)]
-                self.total_residuals[(edge_id, neighbour_edge)] += current_residual
+                self.total_residuals[edge_id][i] += current_residual
 
-    def compute_priority(self, start_node: int, end_node: int):
-        self.priorities[self.edge_ids[(start_node, end_node)]] = 0
+    def compute_priority(self, edge_id: int):
+        start_node, end_node = self.edges[edge_id]
+        self.priorities[edge_id] = 0
 
-        for end_neighbor in self.neighbours[end_node]:
-            edge_id: int = self.edge_ids[(end_node, end_neighbor)]
+        for i, end_neighbor in enumerate(self.neighbours[end_node]):
+            neighbor_edge: int = self.edge_ids[(end_node, end_neighbor)]
             if end_neighbor != start_node:
-                self.priorities[edge_id] = np.sum(
+                self.priorities[neighbor_edge] = np.sum(
                     [
-                        self.total_residuals[self.edge_ids[(sum_run, end_node)], edge_id]
+                        self.total_residuals[self.edge_ids[(sum_run, end_node)]][i]
                         for sum_run in self.neighbours[end_node]
                         if sum_run != end_neighbor
                     ]
                 )
 
     # computes new message for a given edge (startname, endname) in the direction startname -> endname
-    def single_edge_direction_update(self, start_node: int, end_node: int, checked_cts: set[int]):
-        edge_id: int = self.edge_ids[(start_node, end_node)]
+    def single_edge_direction_update(self, edge_id: int, checked_cts: set[int]):
+        start_node, end_node = self.edges[edge_id]
         if (
                 self.categories[start_node] == self.category
-                or self.categories[start_node] == "peptide"
+                or self.categories[start_node] == Category.peptide
         ):
             self.msg_new[edge_id] = self.compute_out_message_variable(
                 start_node, end_node
             )
 
-        if self.categories[start_node] == "convolution_tree" and start_node not in checked_cts:
+        if self.categories[start_node] == Category.convolution_tree and start_node not in checked_cts:
             self.compute_out_messages_ct_tree(start_node)
             checked_cts.add(start_node)
 
-        if self.categories[start_node] == "factor":
+        if self.categories[start_node] == Category.factor:
             self.msg_new[edge_id] = self.compute_out_message_factor(
                 start_node, end_node
             )
@@ -343,18 +343,18 @@ class Messages:
         checked_cts: set[int] = set()  # keeps track of which CT has already been active
 
         if local_loops and self.max_val:
+            start_node = self.max_val[1]
             for end_node in self.neighbours[self.max_val[1]]:
-                start_node = self.max_val[1]
-                self.single_edge_direction_update(start_node, end_node, checked_cts)
+                edge_id: int = self.edge_ids[(start_node, end_node)]
+                self.single_edge_direction_update(edge_id, checked_cts)
 
         else:
-            for start_node, neighbours in enumerate(self.neighbours):
-                for end_node in neighbours:
-                    # update all edges
-                    self.single_edge_direction_update(start_node, end_node, checked_cts)
+            for edge_id, _ in enumerate(self.edges):
+                # update all edges
+                self.single_edge_direction_update(edge_id, checked_cts)
 
-    def get_priority_message(self, priority_vector: pqdict) -> int:
-        self.max_val = priority_vector.top()
+    def get_priority_message(self) -> int:
+        self.max_val = self.priorities.top()
         return self.max_val
 
     def zero_look_ahead_loopy_loop(self, max_loops: int, tolerance: float, local: bool = False) -> Dict[str, npt.NDArray[np.float64]]:
@@ -379,25 +379,11 @@ class Messages:
             print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s")
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
-        for start_node, neighbours in enumerate(self.neighbours):
-            for end_node in neighbours:
-                edge_id: int = self.edge_ids[(start_node, end_node)]
-                rev_edge_id: int = self.edge_ids[(end_node, start_node)]
-                # compute all residuals of the messages in this loop
-                self.full_residuals[edge_id] = self.compute_infinity_norm_residual(edge_id)
-
-                # initialize the total residual to 0
-                for end2 in self.neighbours[end_node]:
-                    edge_id2: int = self.edge_ids[(end_node, end2)]
-                    rev_edge_id2: int = self.edge_ids[(end2, end_node)]
-                    self.total_residuals[(edge_id, edge_id2)] = 0
-                    self.total_residuals[(rev_edge_id2, rev_edge_id)] = 0
-
-            if len(self.total_residuals) % 1000 < 5:
-                print(f"Total residuals length: {len(self.total_residuals)}, size in bytes: {getsizeof(self.total_residuals)}")
+        residuals = [(edge_id, self.compute_infinity_norm_residual(edge_id)) for (edge_id, _) in self.edges]
+        print(f"Total residuals length: {len(residuals)}, size in bytes: {getsizeof(residuals)}")
 
         # set the priority vector once with copy of the previously calculated residuals
-        self.priorities = pqdict(self.full_residuals.copy(), reverse=True)
+        self.priorities = pqdict(residuals, reverse=True)
 
         k = 5
 
@@ -406,19 +392,17 @@ class Messages:
             checked_cts: set[int] = set()
             # actual zero-look-ahead-BP part
             start_t = time.time()
-            priority_message_edge_id = self.get_priority_message(self.priorities)
+            priority_message_edge_id = self.get_priority_message()
             max_residual = self.priorities[priority_message_edge_id]
-            priority_message: Tuple[int, int] = self.edges[priority_message_edge_id]
-            edge_id: int = self.edge_ids[priority_message]
 
-            self.single_edge_direction_update(priority_message[0], priority_message[1], checked_cts)
-            priority_residual = self.compute_infinity_norm_residual(edge_id)
+            self.single_edge_direction_update(priority_message_edge_id, checked_cts)
+            priority_residual = self.compute_infinity_norm_residual(priority_message_edge_id)
             self.msg_log.update(self.msg)
             self.msg.update(self.msg_new)
             self.compute_total_residuals(
-                priority_message[0], priority_message[1], priority_residual
+                priority_message_edge_id, priority_residual
             )
-            self.compute_priority(priority_message[0], priority_message[1])
+            self.compute_priority(priority_message_edge_id)
 
             end_t = time.time()
 
@@ -436,7 +420,7 @@ class Messages:
         for (node_id, node_category) in enumerate(self.categories):
             if (
                     node_category == self.category
-                    or node_category == "peptide"
+                    or node_category == Category.peptide
             ):
                 incoming_messages: List[npt.NDArray[np.float64]] = []
 
@@ -508,7 +492,6 @@ def convert_results_to_csv(results_dict: Dict[str, npt.NDArray[np.float64]], nod
     Save Loopy Belief Propagation results to .csv file
     :param results_dict: dict, {variable:posterior_probability}
     :param node_dict: dict, dictionary of nodes that were in the factor graph and their attributes, to include the node category in the results
-    :param name_string: str, csv output path
     """
 
     full_results_dict = {
