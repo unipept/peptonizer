@@ -418,7 +418,7 @@ class Messages:
 
         print()
 
-        print("Total residuals with value zero: " + str(len([x for _, x in self.total_residuals if x == 0])))
+        print("Total residuals with value zero: " + str(len([x for x in self.total_residuals if x == 0])))
 
         # marginalize once the model has converged
         for (node_id, node_category) in enumerate(self.categories):
