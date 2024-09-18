@@ -1,6 +1,7 @@
 import argparse
 
 from peptonizer.peptonizer import run_belief_propagation
+from memory_profiler import memory_usage
 
 
 parser = argparse.ArgumentParser(
@@ -52,18 +53,24 @@ parser.add_argument(
     help="If True, the regularized version of the noisy-OR model is used.",
 )
 
-args = parser.parse_args()
+def run():
+    args = parser.parse_args()
 
-with open(args.graphml_path, 'r') as in_file:
-    csv_content = run_belief_propagation(
-        in_file.read(),
-        args.alpha,
-        args.beta,
-        args.regularized,
-        args.prior,
-        args.max_iter,
-        args.tol
-    )
+    with open(args.graphml_path, 'r') as in_file:
+        csv_content = run_belief_propagation(
+            in_file.read(),
+            args.alpha,
+            args.beta,
+            args.regularized,
+            args.prior,
+            args.max_iter,
+            args.tol
+        )
 
-    with open(args.out, 'w') as out_file:
-        out_file.write(csv_content)
+        with open(args.out, 'w') as out_file:
+            out_file.write(csv_content)
+
+
+mem_usage = memory_usage(run)
+print('Memory usage (in chunks of .1 seconds): %s' % mem_usage)
+print('Maximum memory usage: %s' % max(mem_usage))

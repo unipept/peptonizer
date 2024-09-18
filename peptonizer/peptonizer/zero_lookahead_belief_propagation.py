@@ -37,6 +37,7 @@ class Messages:
 
         # Keeps track of residuals for edges in the graph
         self.full_residuals: Dict[Tuple[int, int], float] = {}
+
         self.total_residuals: Dict[Tuple[Tuple[int, int], Tuple[int, int]], float] = {}
 
         # Maps a node ID onto its initial belief value
@@ -375,9 +376,6 @@ class Messages:
                 for end2 in self.neighbours[end_node]:
                     self.total_residuals[((start_node, end_node), (end_node, end2))] = 0
                     self.total_residuals[((end2, end_node), (end_node, start_node))] = 0
-
-            if len(self.total_residuals) % 1000 < 5:
-                print(f"Total residuals length: {len(self.total_residuals)}, size in bytes: {getsizeof(self.total_residuals)}")
 
         # set the priority vector once with copy of the previously calculated residuals
         self.priorities = pqdict(self.full_residuals.copy(), reverse=True)
