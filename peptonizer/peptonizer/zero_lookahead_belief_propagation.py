@@ -135,8 +135,8 @@ class Messages:
                 )
 
         if not incoming_messages:
-            # TODO Tanja: what exactly do you want to compare here?
             return node_belief if any(node_belief == self.initial_beliefs[node_out]) else self.msg[self.edge_ids[(node_out, node_in)]]
+
 
         # need for logs to prevent underflow in very large multiplications
         incoming_messages_array = np.asarray(np.log(incoming_messages)).reshape(
@@ -417,6 +417,8 @@ class Messages:
             k += 1
 
         print()
+
+        print("Total residuals with value zero: " + str(len([x for _, x in self.total_residuals if x == 0])))
 
         # marginalize once the model has converged
         for (node_id, node_category) in enumerate(self.categories):

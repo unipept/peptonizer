@@ -20,7 +20,7 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
     # Convert to set in order to efficiently perform set intersection later on
     taxa_filter = set(taxa_filter)
 
-    print("Querying unipept and filtering taxa...")
+    print("Querying Unipept and filtering taxa...")
 
     batches = len(peptides) // UNIPEPT_PEPTIDES_BATCH_SIZE
 
