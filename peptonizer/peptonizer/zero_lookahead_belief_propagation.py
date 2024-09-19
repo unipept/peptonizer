@@ -120,27 +120,19 @@ class Messages:
         self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
         self.msg_log = self.msg_new.copy()
 
-    # variables (peptides, proteins, taxa)
-    def get_incoming_message_variable(self, edge_id: int) -> npt.NDArray[np.float64]:
-        return self.msg[edge_id]
-
     def compute_out_message_variable(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
-        incoming_messages: List[npt.NDArray[np.float64]] = []
+        incoming_messages: List[npt.NDArray[np.float64]] = [
+            self.msg[self.edge_ids[(n, node_out)]]
+            for n in self.neighbours[node_out] if n != node_in
+        ]
         node_belief: npt.NDArray[np.float64] = self.current_beliefs[node_out]
-
-        for node_out_neighbor in self.neighbours[node_out]:
-            if node_out_neighbor != node_in:
-                edge_id: int = self.edge_ids[(node_out_neighbor, node_out)]
-                incoming_messages.append(
-                    self.get_incoming_message_variable(edge_id)
-                )
 
         if not incoming_messages:
             return node_belief if any(node_belief == self.initial_beliefs[node_out]) else self.msg[self.edge_ids[(node_out, node_in)]]
 
 
         # need for logs to prevent underflow in very large multiplications
-        incoming_messages_array = np.asarray(np.log(incoming_messages)).reshape(
+        incoming_messages_array = np.log(incoming_messages).reshape(
             len(incoming_messages), 2
         )
 
@@ -158,13 +150,9 @@ class Messages:
 
         return out_message_log
 
-    # factors (Conditional probability tables), handles different dimension of output/input variables
-    def get_incoming_message_factor(self, edge_id: int) -> npt.NDArray[np.float64]:
-        return self.msg[edge_id]
-
     def compute_out_message_factor(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
         incoming_messages: List[npt.NDArray[np.float64]] = [
-            self.get_incoming_message_factor(self.edge_ids[(n, node_out)])
+            self.msg[self.edge_ids[(n, node_out)]]
             for n in self.neighbours[node_out] if n != node_in
         ]
         node_belief = self.current_beliefs[node_out]
@@ -426,7 +414,7 @@ class Messages:
                 for variable_neighbour in self.neighbours[node_id]:
                     edge_id: int = self.edge_ids[(variable_neighbour, node_id)]
                     incoming_messages.append(
-                        self.get_incoming_message_variable(edge_id)
+                        self.msg[edge_id]
                     )
 
                 # log to avoid overflow
