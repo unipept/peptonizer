@@ -3,7 +3,6 @@
 import time
 from enum import Enum
 from sys import getsizeof
-from array import array
 
 from dockerpty import start
 
@@ -38,20 +37,20 @@ class Messages:
         # Maps a node identifier (as specified by the CTGraph) onto a unique integer.
         self.node_descriptions: Dict[str, int] = {}
         # Reverse mapping of the dict above
-        self.node_id_to_description: List[str] = ["" for _ in range(amount_of_nodes)]
+        self.node_id_to_description: List[str] = []
         # Maps a node ID onto its category
-        self.categories: List[Category] = [Category.peptide for _ in range(amount_of_nodes)]
+        self.categories: List[Category] = []
         # Maps a node ID onto a list of its neighbouring node IDs
-        self.neighbours: List[array[int]] = [array('i', []) for _ in range(amount_of_nodes)]
+        self.neighbours: List[List[int]] = []
         # Keeps track of the number of parents of a node
-        self.number_of_parents: array[int] = array('i', [0 for _ in range(amount_of_nodes)])
+        self.number_of_parents: List[int] = [0 for _ in range(amount_of_nodes)]
         # Maps an edge as a tuple of node ids to an id
         self.edge_ids: Dict[Tuple[int, int], int] = {}
         # Reverse mapping of the dict above
-        self.edges: List[Tuple[int, int]] = [(0, 0) for _ in range(2 * amount_of_edges)]
+        self.edges: List[Tuple[int, int]] = []
 
         # Keeps track of residuals for duos of edges, indexed by [edge index][neighbour index of edge's end node]
-        self.total_residuals: List[array[float]] = []
+        self.total_residuals: List[List[float]] = []
 
         # Maps a node ID onto its initial belief value
         self.initial_beliefs: List[npt.NDArray[np.float64]] = []
@@ -69,8 +68,8 @@ class Messages:
             assert node[0] not in self.node_descriptions
 
             self.node_descriptions[node[0]] = node_id
-            self.node_id_to_description[node_id] = node[0]
-            self.categories[node_id] = Category[node[1]["category"]]
+            self.node_id_to_description.append(node[0])
+            self.categories.append(Category[node[1]["category"]])
 
             # Only convolution trees have a number of parents property assigned to them.
             if node[1]["category"] == "convolution_tree":
@@ -89,7 +88,7 @@ class Messages:
 
         # Now that all nodes have been processed, we need to replace all the neighbours of a node by their node IDs
         for (node_id, node) in enumerate(ct_graph_in.nodes(data=True)):
-            self.neighbours[node_id] = array('i', [self.node_descriptions[n] for n in ct_graph_in.neighbors(node[0])])
+            self.neighbours.append([self.node_descriptions[n] for n in ct_graph_in.neighbors(node[0])])
 
         # Now, also replace the edge descriptions by the corresponding node IDs
         graph_edges = ct_graph_in.edges(data=True)
@@ -102,9 +101,9 @@ class Messages:
 
             rev_edge_id = edge_id + 1
             self.edge_ids[(start_node_id, end_node_id)] = edge_id
-            self.edges[edge_id] = (start_node_id, end_node_id)
+            self.edges.append((start_node_id, end_node_id))
             self.edge_ids[(end_node_id, start_node_id)] = rev_edge_id
-            self.edges[rev_edge_id] = (end_node_id, start_node_id)
+            self.edges.append((end_node_id, start_node_id))
 
             if "MessageLength" in data:
                 self.msg[edge_id] = np.ones(data["MessageLength"])
@@ -118,7 +117,7 @@ class Messages:
 
             edge_id += 2
 
-        self.total_residuals = [array('d', [0 for _ in self.neighbours[end_node]]) for (_, end_node) in self.edges]
+        self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
         self.msg_log = self.msg_new.copy()
 
     # variables (peptides, proteins, taxa)
@@ -164,17 +163,11 @@ class Messages:
         return self.msg[edge_id]
 
     def compute_out_message_factor(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
-        incoming_messages: List[npt.NDArray[np.float64]] = []
+        incoming_messages: List[npt.NDArray[np.float64]] = [
+            self.get_incoming_message_factor(self.edge_ids[(n, node_out)])
+            for n in self.neighbours[node_out] if n != node_in
+        ]
         node_belief = self.current_beliefs[node_out]
-
-        for node_out_neighbour in self.neighbours[node_out]:
-            if node_out_neighbour != node_in:
-                edge_id: int = self.edge_ids[(node_out_neighbour, node_out)]
-                if [self.get_incoming_message_factor(edge_id)]:
-                    # only the messages that have changed get multiplied into the current belief again
-                    incoming_messages.append(
-                        self.get_incoming_message_factor(edge_id)
-                    )
 
         if self.categories[node_in] == Category.convolution_tree:
             # handles empty & messages with only one value
@@ -191,10 +184,10 @@ class Messages:
 
             return np.add(out_messages[:, 0], out_messages[:, 1])
         else:
-            if np.asarray(incoming_messages[0]).shape[0] > 2:
+            if len(incoming_messages[0]) > 2:
                 incoming_messages_log = np.log(
                     np.asarray(incoming_messages).reshape(
-                        incoming_messages[0].shape[0], 1
+                        len(incoming_messages[0]), 1
                     )
                 )
                 # catch warning for log(0)
