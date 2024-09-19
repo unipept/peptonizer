@@ -4,8 +4,6 @@ import time
 from enum import Enum
 from sys import getsizeof
 
-from dockerpty import start
-
 from .convolution_tree import *
 from .factor_graph_generation import *
 from .pqdict import pqdict

@@ -78,7 +78,7 @@ const startToPeptonize = async function() {
             text: 'Peptonizer Confidence Scores'
         },
         xAxis: {
-            categories: labels,
+            categories: labels.slice(0, 20),
             title: {
                 text: 'Peptide IDs'
             }
@@ -92,7 +92,7 @@ const startToPeptonize = async function() {
             },
             labels: {
                 overflow: 'justify',
-                format: '{value:.2f}'
+                format: '{value:.3f}'
             }
         },
         tooltip: {
@@ -102,13 +102,13 @@ const startToPeptonize = async function() {
             bar: {
                 dataLabels: {
                     enabled: true,
-                    format: '{y:.2f}'
+                    format: '{y:.3f}'
                 }
             }
         },
         series: [{
             name: 'Confidence score',
-            data: values
+            data: values.slice(0, 20)
         }]
     });
 
