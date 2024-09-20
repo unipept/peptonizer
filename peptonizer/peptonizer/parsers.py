@@ -5,15 +5,15 @@ from typing import Dict, Tuple, List
 
 def parse_pout(pout_file: str, fdr_threshold: float) -> Dict[str, Dict[str, float | int]]:
     """
-      Parses the ms2rescore pout file for peptides, psm numbers and peptide scores.
+    Parses the ms2rescore pout file for peptides, psm numbers and peptide scores.
 
-      Note: this code was adapted from the Pout2Prot tool.
+    Note: this code was adapted from the Pout2Prot tool.
 
-      :param pout_file: str, content of pout files that needs to be parsed. Note: these should not be paths to pout
-      files, but the contents of these files already!
-      :param fdr_threshold: float, FDR threshold below which psms are kept
-      :return: dict, peptides:[score,#psms]
-      """
+    :param pout_file: str, content of pout files that needs to be parsed. Note: these should not be paths to pout
+    files, but the contents of these files already!
+    :param fdr_threshold: float, FDR threshold below which psms are kept
+    :return: dict, peptides:[score,#psms]
+    """
 
     pep_score = dict()
     pep_psm = dict()

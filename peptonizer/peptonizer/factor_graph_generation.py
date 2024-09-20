@@ -84,8 +84,7 @@ class FactorGraph(nx.Graph):
 # separate the connected components in the subgraph
 def separate_subgraphs(graph_in, nodes_to_keep):
     """
-    separations of subgraphs (create news graphs for each subgraph)
-
+    Separations of subgraphs (create news graphs for each subgraph)
     """
     new_graph = CTFactorGraph(nx.Graph())
 
