@@ -3,7 +3,7 @@
 import time
 from enum import Enum
 from sys import getsizeof
-from copy import deepcopy
+
 from dockerpty import start
 
 from .convolution_tree import *
@@ -123,7 +123,7 @@ class Messages:
             edge_id += 2
 
         self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
-        self.msg_in_log = deepcopy(self.msg_in_new)
+        self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in_new]
 
     def compute_out_message_variable(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
         node_in_neighbour_index = self.neighbours[node_out].index(node_in)
@@ -364,8 +364,8 @@ class Messages:
         for k in range(0, 5):
             start_t = time.time()
             self.compute_update()
-            self.msg_in_log = self.msg_in.copy()
-            self.msg_in = self.msg_in_new.copy()
+            self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in]
+            self.msg_in = [msg_in.copy() for msg_in in self.msg_in_new]
             k += 1
             end_t = time.time()
             print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s")
@@ -390,8 +390,8 @@ class Messages:
 
             self.single_edge_direction_update(start_node, end_node, checked_cts)
             priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
-            self.msg_in_log = self.msg_in
-            self.msg_in = self.msg_in_new
+            self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in]
+            self.msg_in = [msg_in.copy() for msg_in in self.msg_in_new]
             self.compute_total_residuals(
                 priority_message_edge_id, priority_residual
             )
