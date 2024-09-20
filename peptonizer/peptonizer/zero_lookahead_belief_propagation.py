@@ -300,8 +300,8 @@ class Messages:
         self.priorities[edge_id] = 0
 
         for i, end_neighbor in enumerate(self.neighbours[end_node]):
-            neighbor_edge: int = self.edge_ids[(end_node, end_neighbor)]
             if end_neighbor != start_node:
+                neighbor_edge: int = self.edge_ids[(end_node, end_neighbor)]
                 self.priorities[neighbor_edge] = np.sum(
                     [
                         self.total_residuals[self.edge_ids[(sum_run, end_node)]][i]
@@ -390,8 +390,9 @@ class Messages:
 
             self.single_edge_direction_update(start_node, end_node, checked_cts)
             priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
-            self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in]
-            self.msg_in = [msg_in.copy() for msg_in in self.msg_in_new]
+            start_node_neighbour_id = self.neighbours[end_node].index(start_node)
+            self.msg_in_log[end_node][start_node_neighbour_id] = self.msg_in[end_node][start_node_neighbour_id].copy()
+            self.msg_in[end_node][start_node_neighbour_id] = self.msg_in_new[end_node][start_node_neighbour_id].copy()
             self.compute_total_residuals(
                 priority_message_edge_id, priority_residual
             )
