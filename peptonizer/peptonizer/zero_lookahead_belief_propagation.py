@@ -3,7 +3,7 @@
 import time
 from enum import Enum
 from sys import getsizeof
-
+from copy import deepcopy
 from dockerpty import start
 
 from .convolution_tree import *
@@ -123,9 +123,9 @@ class Messages:
             edge_id += 2
 
         self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
-        self.msg_in_log = self.msg_in_new.copy()
+        self.msg_in_log = deepcopy(self.msg_in_new)
 
-    def compute_out_message_variable(self, node_in: int, node_out: int) -> npt.NDArray[np.float64]:
+    def compute_out_message_variable(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
         node_in_neighbour_index = self.neighbours[node_out].index(node_in)
         incoming_messages: List[npt.NDArray[np.float64]] = self.msg_in[node_out].copy()
         incoming_messages.pop(node_in_neighbour_index)
@@ -140,8 +140,6 @@ class Messages:
             len(incoming_messages), 2
         )
 
-        print(np.sum(incoming_messages_array[:, 0]))
-        print(node_belief)
         out_message_log = array_utils.log_normalize(
             np.asarray(
                 [
@@ -156,7 +154,7 @@ class Messages:
 
         return out_message_log
 
-    def compute_out_message_factor(self, node_in: int, node_out: int) -> npt.NDArray[np.float64]:
+    def compute_out_message_factor(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
         node_in_neighbour_index = self.neighbours[node_out].index(node_in)
         incoming_messages: List[npt.NDArray[np.float64]] = self.msg_in[node_out].copy()
         incoming_messages.pop(node_in_neighbour_index)
@@ -196,12 +194,7 @@ class Messages:
                 incoming_messages_array = np.asarray(incoming_messages).reshape(
                     len(incoming_messages), 2
                 )
-                print(incoming_messages_array.shape)
-                print(node_belief.shape)
-                print(np.multiply(
-                        node_belief,
-                        incoming_messages_array.prod(axis=0)
-                    ).shape)
+
                 out_messages = array_utils.normalize(
                     np.multiply(
                         node_belief,
@@ -211,7 +204,6 @@ class Messages:
                         ],
                     )
                 )
-                print(out_messages)
                 return np.asarray([np.sum(out_messages[0, :]), np.sum(out_messages[1, :])])
 
     def compute_out_messages_ct_tree(self, node: int):
@@ -379,7 +371,7 @@ class Messages:
             print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s")
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
-        residuals = [(edge_id, self.compute_infinity_norm_residual(*self.edges[edge_id])) for (edge_id, _) in self.edges]
+        residuals = [(edge_id, self.compute_infinity_norm_residual(*edge)) for edge_id, edge in enumerate(self.edges)]
         print(f"Total residuals length: {len(residuals)}, size in bytes: {getsizeof(residuals)}")
 
         # set the priority vector once with copy of the previously calculated residuals
@@ -398,8 +390,8 @@ class Messages:
 
             self.single_edge_direction_update(start_node, end_node, checked_cts)
             priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
-            self.msg_in_log = self.msg_in.copy()
-            self.msg_in = self.msg_in_new.copy()
+            self.msg_in_log = self.msg_in
+            self.msg_in = self.msg_in_new
             self.compute_total_residuals(
                 priority_message_edge_id, priority_residual
             )
