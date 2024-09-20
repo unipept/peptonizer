@@ -31,7 +31,8 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
 
         # Prepare the request payload
         payload = {
-            "peptides": batch
+            "peptides": batch,
+            "tryptic": False
         }
 
         # Perform the HTTP POST request

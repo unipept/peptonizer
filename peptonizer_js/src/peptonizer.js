@@ -9,10 +9,8 @@ import { asyncRun } from "./py-worker";
  * @return Mapping between NCBI taxon IDs (integer, > 0) and probabilities (float in [0, 1]).
  */
 export async function peptonize(psmContent) {
-    const data = await (await fetch("data/rescored_medium.psms.tsv")).text();
-
     const { results, error } = await asyncRun( {
-        psms: data
+        psms: psmContent
     });
 
     console.log("Possible errors: ");
