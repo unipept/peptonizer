@@ -13,6 +13,12 @@ parser.add_argument(
     help="Number of taxa to include in the final Peptonizer2000 output.",
 )
 parser.add_argument(
+    "--sequence-scores-dataframe-file",
+    type=str,
+    required=False,
+    help="Output: path to a CSV-file that will contain all computed sequence scores.",
+)
+parser.add_argument(
     "--taxa-weights-dataframe-file",
     type=str,
     required=False,
@@ -65,4 +71,6 @@ df, weights = perform_taxa_weighing(
 )
 
 print("Started dumping produced results to CSV-files...")
-df.to_csv(args.taxa_weights_dataframe_file)
+df.to_csv(args.sequence_scores_dataframe_file)
+weights.to_csv(args.taxa_weights_dataframe_file)
+

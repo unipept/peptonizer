@@ -363,7 +363,6 @@ class Messages:
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
         residuals = [(edge_id, self.compute_infinity_norm_residual(edge_id)) for (edge_id, _) in self.edges]
-        print(f"Total residuals length: {len(residuals)}, size in bytes: {getsizeof(residuals)}")
 
         # set the priority vector once with copy of the previously calculated residuals
         self.priorities = pqdict(residuals, reverse=True)
@@ -398,8 +397,6 @@ class Messages:
             k += 1
 
         print()
-
-        print("Total residuals with value zero: " + str(len([x for x in self.total_residuals if x == 0])))
 
         # marginalize once the model has converged
         for (node_id, node_category) in enumerate(self.categories):
