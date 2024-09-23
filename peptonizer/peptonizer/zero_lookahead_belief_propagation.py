@@ -376,7 +376,7 @@ class Messages:
         k = 5
 
         # keep track of the nodes of which the incoming messages have changed
-        prev_changed = []
+        prev_changed = [i for i in range(len(self.msg_in))]
         print(f"\rTime spent in loop 0/{max_loops}: 0s -> residual max 0", end="")
         while k < max_loops and max_residual > tolerance:
             # actual zero-look-ahead-BP part
@@ -387,22 +387,22 @@ class Messages:
 
             self.single_edge_direction_update(start_node, end_node, set())
 
-            start_node_neighbour_id = self.neighbours[end_node].index(start_node)
-            changed = []
+            # TODO: should this not be after updating messages? (uses msg_in and msg_log)
+            priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
+            for node in prev_changed:
+                self.msg_in_log[node] = self.msg_in[node].copy()
+            prev_changed = []
             # if the start node is a convolution tree, all the incoming messages of the neighbours can be changed.
             if self.categories[start_node] == Category.convolution_tree:
                 for node in self.neighbours[start_node]:
-                    changed.append(node)
+                    prev_changed.append(node)
                     for i, neighbour in enumerate(self.neighbours[node]):
                         self.msg_in[node][i] = self.msg_in_new[node][i]
             else:
+                start_node_neighbour_id = self.neighbours[end_node].index(start_node)
                 self.msg_in[end_node][start_node_neighbour_id] = self.msg_in_new[end_node][start_node_neighbour_id]
-                changed.append(end_node)
+                prev_changed.append(end_node)
 
-            for node in prev_changed:
-                self.msg_in_log[node] = self.msg_in[node].copy()
-
-            priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
             self.compute_total_residuals(
                 priority_message_edge_id, priority_residual
             )
@@ -417,7 +417,6 @@ class Messages:
                     end="")
 
             k += 1
-            prev_changed = changed
 
         print()
 
