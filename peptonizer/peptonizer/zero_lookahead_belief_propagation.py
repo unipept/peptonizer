@@ -212,11 +212,10 @@ class Messages:
         peptides: List[int] = []
         prot_list: List[int] = []
 
-        for node_in in self.neighbours[node]:
-            node_in_neighbour_index = self.neighbours[node].index(node_in)
+        for node_in_neighbour_index, node_in in enumerate(self.neighbours[node]):
             if self.categories[node_in] != Category.factor:
                 prot_prob_list.append(self.msg_in[node][node_in_neighbour_index])
-                old_prot_prob_list.append(self.msg_in[node][node_in_neighbour_index])
+                old_prot_prob_list.append(self.msg_in_log[node][node_in_neighbour_index])
                 prot_list.append(node_in)
             else:
                 peptides.append(node_in)
@@ -240,7 +239,7 @@ class Messages:
             # only update when the shared likelihoods or at least one of the protein messages has changed
             ct = ConvolutionTree(shared_likelihoods, prot_prob_list)
 
-            for protein_id, protein in prot_list:
+            for protein_id, protein in enumerate(prot_list):
                 node_neighbour_index = self.neighbours[protein].index(node)
                 self.msg_in_new[protein][node_neighbour_index] = ct.message_to_variable(protein_id)
                 msg = self.msg_in_new[protein][node_neighbour_index]
@@ -424,7 +423,7 @@ class Messages:
                     )
 
                 # log to avoid overflow
-                incoming_messages_array = np.asarray(np.log(incoming_messages)).reshape(
+                incoming_messages_array = np.log(incoming_messages).reshape(
                     len(incoming_messages), 2
                 )
                 logged_variable_marginal = array_utils.log_normalize(
