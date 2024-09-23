@@ -30,7 +30,6 @@ class Messages:
         self.category: Category = Category[ct_graph_in.category]
 
         amount_of_nodes = ct_graph_in.number_of_nodes()
-        amount_of_edges = ct_graph_in.number_of_edges()
 
         # Maps a node identifier (as specified by the CTGraph) onto a unique integer.
         self.node_descriptions: Dict[str, int] = {}
@@ -376,20 +375,34 @@ class Messages:
 
         k = 5
 
+        # keep track of the nodes of which the incoming messages have changed
+        prev_changed = []
         print(f"\rTime spent in loop 0/{max_loops}: 0s -> residual max 0", end="")
         while k < max_loops and max_residual > tolerance:
-            checked_cts: set[int] = set()
             # actual zero-look-ahead-BP part
             start_t = time.time()
             priority_message_edge_id = self.get_priority_message()
             max_residual = self.priorities[priority_message_edge_id]
             (start_node, end_node) = self.edges[priority_message_edge_id]
 
-            self.single_edge_direction_update(start_node, end_node, checked_cts)
-            priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
+            self.single_edge_direction_update(start_node, end_node, set())
+
             start_node_neighbour_id = self.neighbours[end_node].index(start_node)
-            self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in]
-            self.msg_in = [msg_in.copy() for msg_in in self.msg_in_new]
+            changed = []
+            # if the start node is a convolution tree, all the incoming messages of the neighbours can be changed.
+            if self.categories[start_node] == Category.convolution_tree:
+                for node in self.neighbours[start_node]:
+                    changed.append(node)
+                    for i, neighbour in enumerate(self.neighbours[node]):
+                        self.msg_in[node][i] = self.msg_in_new[node][i]
+            else:
+                self.msg_in[end_node][start_node_neighbour_id] = self.msg_in_new[end_node][start_node_neighbour_id]
+                changed.append(end_node)
+
+            for node in prev_changed:
+                self.msg_in_log[node] = self.msg_in[node].copy()
+
+            priority_residual = self.compute_infinity_norm_residual(start_node, end_node)
             self.compute_total_residuals(
                 priority_message_edge_id, priority_residual
             )
@@ -404,6 +417,7 @@ class Messages:
                     end="")
 
             k += 1
+            prev_changed = changed
 
         print()
 
