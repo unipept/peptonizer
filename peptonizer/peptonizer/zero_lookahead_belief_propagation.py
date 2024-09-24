@@ -138,7 +138,7 @@ class Messages:
         )
 
         out_message_log = array_utils.log_normalize(
-            np.sum([np.log(node_belief), np.sum(incoming_messages_array, axis=0)], axis=0)
+            np.log(node_belief) + np.sum(incoming_messages_array, axis=0)
         )
 
         if not np.all(out_message_log):
@@ -173,7 +173,7 @@ class Messages:
                 # catch warning for log(0)
 
                 log_belief = np.log(node_belief)
-                out_messages_log = array_utils.log_normalize(np.add(log_belief, incoming_messages_log))
+                out_messages_log = array_utils.log_normalize(log_belief + incoming_messages_log)
                 if not np.all(out_messages_log):
                     out_messages_log[out_messages_log == 0] = 1e-30
 
@@ -426,10 +426,7 @@ class Messages:
                     len(incoming_messages), 2
                 )
                 logged_variable_marginal = array_utils.log_normalize(
-                    np.sum([
-                        np.log(self.initial_beliefs[node_id]),
-                        np.sum(incoming_messages_array, axis=0),
-                    ], axis=0)
+                    np.log(self.initial_beliefs[node_id]) + np.sum(incoming_messages_array, axis=0)
                 )
 
                 self.current_beliefs[node_id] = logged_variable_marginal
