@@ -138,12 +138,7 @@ class Messages:
         )
 
         out_message_log = array_utils.log_normalize(
-            np.asarray(
-                [
-                    np.sum([np.log(node_belief[0]), np.sum(incoming_messages_array[:, 0])]),
-                    np.sum([np.log(node_belief[1]), np.sum(incoming_messages_array[:, 1])]),
-                ]
-            )
+            np.sum([np.log(node_belief), np.sum(incoming_messages_array, axis=0)], axis=0)
         )
 
         if not np.all(out_message_log):
@@ -164,13 +159,10 @@ class Messages:
                 len(incoming_messages), 2
             )
             out_messages = array_utils.normalize(
-                np.multiply(
-                    node_belief,
-                    [np.prod(in_messages_array[:, 0]), np.prod(in_messages_array[:, 1])],
-                )
+                np.multiply(node_belief, np.prod(in_messages_array, axis=0))
             )  # lognormalize(np.add(np.log(NodeBelief),[np.sum(IncomingMessages[:,0]),np.sum(IncomingMessages[:,1])]))#
 
-            return np.add(out_messages[:, 0], out_messages[:, 1])
+            return np.sum(out_messages, axis=1)
         else:
             if len(incoming_messages[0]) > 2:
                 incoming_messages_log = np.log(
@@ -185,7 +177,7 @@ class Messages:
                 if not np.all(out_messages_log):
                     out_messages_log[out_messages_log == 0] = 1e-30
 
-                return np.asarray([np.sum(out_messages_log[0, :]), np.sum(out_messages_log[1, :])])
+                return np.asarray(np.sum(out_messages_log[:2], axis=1))
             else:
                 incoming_messages.append(np.asarray([1.0, 1.0]))
                 incoming_messages_array = np.asarray(incoming_messages).reshape(
@@ -193,15 +185,9 @@ class Messages:
                 )
 
                 out_messages = array_utils.normalize(
-                    np.multiply(
-                        node_belief,
-                        [
-                            np.prod(incoming_messages_array[:, 0]),
-                            np.prod(incoming_messages_array[:, 1]),
-                        ],
-                    )
+                    node_belief * np.prod(incoming_messages_array, axis=0)
                 )
-                return np.asarray([np.sum(out_messages[0, :]), np.sum(out_messages[1, :])])
+                return np.sum(out_messages, axis=1)
 
     def compute_out_messages_ct_tree(self, node: int):
         prot_prob_list: List[npt.NDArray[np.float64]] = []
@@ -440,22 +426,10 @@ class Messages:
                     len(incoming_messages), 2
                 )
                 logged_variable_marginal = array_utils.log_normalize(
-                    np.asarray(
-                        [
-                            np.sum(
-                                [
-                                    np.log(self.initial_beliefs[node_id][0]),
-                                    np.sum(incoming_messages_array[:, 0]),
-                                ]
-                            ),
-                            np.sum(
-                                [
-                                    np.log(self.initial_beliefs[node_id][1]),
-                                    np.sum(incoming_messages_array[:, 1]),
-                                ]
-                            ),
-                        ]
-                    )
+                    np.sum([
+                        np.log(self.initial_beliefs[node_id]),
+                        np.sum(incoming_messages_array, axis=0),
+                    ], axis=0)
                 )
 
                 self.current_beliefs[node_id] = logged_variable_marginal
