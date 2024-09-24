@@ -88,7 +88,7 @@ class Messages:
         for (node_id, node) in enumerate(ct_graph_in.nodes(data=True)):
             self.neighbours.append([self.node_descriptions[n] for n in ct_graph_in.neighbors(node[0])])
 
-        # Incomming messages for each node, initialize with correct dimensions
+        # Incoming messages for each node, initialize with correct dimensions
         self.msg_in = [[np.zeros(0) for _ in range(len(self.neighbours[i]))] for i in range(amount_of_nodes)]
         self.msg_in_new = [[np.zeros(0) for _ in range(len(self.neighbours[i]))] for i in range(amount_of_nodes)]
         self.msg_in_log = [[np.zeros(0) for _ in range(len(self.neighbours[i]))] for i in range(amount_of_nodes)]
@@ -121,6 +121,47 @@ class Messages:
 
         self.total_residuals = [[0 for _ in self.neighbours[end_node]] for (_, end_node) in self.edges]
         self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in_new]
+
+
+    def print_mem_usage(self):
+        print("max_val: " + str(getsizeof(self.max_val)) + " bytes")
+        priorities_size = len(self.priorities) * (2 * getsizeof(int()))
+        print("priorities (app): " + str(priorities_size) + " bytes")
+        print("category: " + str(getsizeof(self.category)) + " bytes")
+
+        node_descriptions = len(self.node_descriptions) * (getsizeof(int()) + getsizeof("factor"))
+        print("node_descriptions: " + str(node_descriptions) + " bytes")
+        node_id_to_description = len(self.node_id_to_description) * (getsizeof("factor"))
+        print("node_id_to_description: " + str(node_id_to_description) + " bytes")
+
+        categories = len(self.categories) * (getsizeof(Category))
+        print("categories: " + str(categories) + " bytes")
+
+        total_neighbours = sum([len(n) for n in self.neighbours])
+        neighbours = total_neighbours * getsizeof(int()) + len(self.neighbours) * (getsizeof([]))
+        print("neighbours: " + str(neighbours) + " bytes")
+
+        number_of_parents = len(self.number_of_parents) * (getsizeof(int()))
+        print("number_of_parents: " + str(number_of_parents) + " bytes")
+
+        edge_ids = len(self.edge_ids) * (getsizeof((int(), int())) + getsizeof(int()))
+        print("edge_ids: " + str(edge_ids) + " bytes")
+        edges = len(self.edges) * getsizeof((int(), int()))
+        print("edges: " + str(edges) + " bytes")
+
+        total_edge_duos = sum([len(self.neighbours[end_node]) for (_, end_node) in self.edges])
+        total_residuals = total_edge_duos * getsizeof(float()) + len(self.total_residuals) * getsizeof([])
+        print("total_residuals: " + str(total_residuals) + " bytes")
+
+        total_belief_size = sum([len(n) for n in self.initial_beliefs])
+        initial_beliefs = len(self.initial_beliefs) * getsizeof(np.array([])) + total_belief_size * 8
+        print("initial_beliefs / current_beliefs: " + str(initial_beliefs) + " bytes")
+
+        # Incoming messages for each node
+        total_msg_length = sum([sum([len(m) for m in n]) for n in self.msg_in])
+        total_msg_lists = sum([len(n) for n in self.msg_in]) + len(self.msg_in)
+        msg_in = total_msg_length * 8 + total_msg_lists * getsizeof([])
+        print("msg_in / msg_in_new / msg_in_log: " + str(msg_in) + " bytes")
 
     def compute_out_message_variable(self, node_out: int, node_in: int) -> npt.NDArray[np.float64]:
         node_in_neighbour_index = self.neighbours[node_out].index(node_in)
