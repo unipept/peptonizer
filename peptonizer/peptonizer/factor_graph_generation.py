@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Tuple
 
 import numpy as np
 import networkx as nx
@@ -16,7 +16,7 @@ class TaxonGraph(nx.Graph):
         super().__init__()
         self.taxon_id_list = []
 
-    def create_from_taxa_weights(self, taxa_weights):
+    def create_from_taxa_weights(self, taxa_weights: pd.DataFrame, use_communities: bool = True):
         # drop rows that have an entry in HigherTaxa that appears only once
         counts = taxa_weights["HigherTaxa"].value_counts()
         taxa_weights = taxa_weights[
@@ -42,13 +42,17 @@ class TaxonGraph(nx.Graph):
         intermediate_graph.add_nodes_from(peptide_attributes)
         intermediate_graph.add_nodes_from(taxa_attributes)
 
-        # cluster the resulting graph with the louvain algorithm
-        communities = nx.community.louvain_communities(intermediate_graph, seed=12345)
+        if use_communities:
+            # TODO we should get rid of the seed here for the production version...
+            # cluster the resulting graph with the louvain algorithm
+            communities = nx.community.louvain_communities(intermediate_graph, seed=12345)
 
-        # separate the graph into its communities and enter into same graph object
-        for i, community in enumerate(communities):
-            subgraph = intermediate_graph.subgraph(community)
-            self.add_edges_from(subgraph.edges)
+            # separate the graph into its communities and enter into same graph object
+            for i, community in enumerate(communities):
+                subgraph = intermediate_graph.subgraph(community)
+                self.add_edges_from(subgraph.edges)
+        else:
+            self.add_edges_from(intermediate_graph)
 
         self.add_nodes_from(peptide_attributes)
         self.add_nodes_from(taxa_attributes)
@@ -269,10 +273,16 @@ def generate_ct_factor_graphs(list_of_factor_graphs, graph_type="Taxons"):
 
 
 def generate_pepgm_graph(
-    taxa_weights_data_frame: pd.DataFrame
+    taxa_weights_data_frame: pd.DataFrame,
+    use_communities: bool = True
 ) -> CTFactorGraph:
-    taxon_graph = TaxonGraph()
-    taxon_graph.create_from_taxa_weights(taxa_weights_data_frame)
+    print(f"Generating PepGM graph, is clustering enabled? -> {use_communities}")
+
+    # Create taxon graph and split into smaller communities
+    communities_taxon_graph = TaxonGraph()
+    communities_taxon_graph.create_from_taxa_weights(taxa_weights_data_frame, use_communities)
+
     factor_graph = FactorGraph()
-    factor_graph.construct_from_existing_graph(taxon_graph)
+    factor_graph.construct_from_existing_graph(communities_taxon_graph)
+
     return generate_ct_factor_graphs(factor_graph)

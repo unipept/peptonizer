@@ -20,8 +20,17 @@ parser.add_argument(
     required=True,
     help="Path to output file where GraphML will be saved.",
 )
+parser.add_argument(
+    "--use-communities",
+    type=bool,
+    required=False,
+    default=True
+)
 
 args = parser.parse_args()
 
-ct_factor_graph = generate_pepgm_graph(pd.read_csv(args.sequence_scores_dataframe_file))
+ct_factor_graph = generate_pepgm_graph(pd.read_csv(
+    args.sequence_scores_dataframe_file),
+    use_communities=args.use_communities
+)
 ct_factor_graph.save_to_graph_ml(args.out)

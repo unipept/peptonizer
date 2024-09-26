@@ -24,7 +24,7 @@ class CTNode:
     # passing msges down: adding variables
     @staticmethod
     def create_count_node(lhs: 'CTNode', rhs: 'CTNode') -> 'CTNode':
-        # create a count node with joint prob for two parents above(vs the init if we have no parents)
+        # create a count node with joint prob for two parents above (vs the init if we have no parents)
         joint_above = fftconvolve(lhs.joint_above, rhs.joint_above)
         result = CTNode(joint_above)
 
