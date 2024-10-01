@@ -72,17 +72,4 @@ for name, size in sorted(((name, getsizeof(value)) for name, value in list(
         locals().items())), key=lambda x: -x[1])[:10]:
     print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
 
-print("Started running PepGM...")
-pepgm_results = peptonizer.run_belief_propagation(
-    pepgm_graph,
-    0.9,
-    0.6,
-    True,
-    0.5
-)
-print("Successfully executed PepGM...")
-
-# Now convert the results from PepGM into a list of taxon IDs and the corresponding score values.
-final_scores = peptonizer.extract_taxon_scores(pepgm_results)
-
-json.dumps(final_scores)
+json.dumps(pepgm_graph)

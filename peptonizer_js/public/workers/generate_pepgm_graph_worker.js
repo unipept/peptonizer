@@ -27,7 +27,7 @@ self.onmessage = async (event) => {
     try {
         pyodide.globals.set('input', psms);
 
-        const peptonizer_code = await (await fetch('./peptonizer_script.py')).text();
+        const peptonizer_code = await (await fetch('./generate_pepgm_graph.py')).text();
         // Run the Python code with Pyodide
         let results = await self.pyodide.runPythonAsync(peptonizer_code);
         self.postMessage({ results, id });

@@ -1,4 +1,4 @@
-import { asyncRun } from "./py-worker";
+import { asyncPepgmGraphGeneration, asyncPepgmExecution } from "./py-worker";
 
 /**
  * Start the peptonizer. This function takes in a PSM-file that has been read in earlier (so no file paths here). The
@@ -11,8 +11,14 @@ import { asyncRun } from "./py-worker";
 export async function peptonize(psmContent) {
     const data = await (await fetch("data/rescored_medium.psms.tsv")).text();
 
-    const { results, error } = await asyncRun( {
+    console.log("Before graph generation")
+    const { graph, generation_error } = await asyncPepgmGraphGeneration( {
         psms: data
+    });
+
+    console.log("Before graph execution")
+    const { results, error } = asyncPepgmExecution( {
+        graph: graph
     });
 
     console.log("Possible errors: ");
