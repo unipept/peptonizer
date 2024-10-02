@@ -9,15 +9,14 @@ import { pepgmGraphGeneration, asyncPepgmExecution } from "./py-worker";
  * @return Mapping between NCBI taxon IDs (integer, > 0) and probabilities (float in [0, 1]).
  */
 export async function peptonize(psmContent) {
-    const { results, error } = 
-        await fetch("/data/rescored_small.psms.tsv")
-        .then(x => x.text())
-        .then(data => pepgmGraphGeneration({ psms: data }))
+    return pepgmGraphGeneration({ psms: psmContent })
         .then(data => {
             if (data.error) return { error: data.error };
             return asyncPepgmExecution({ graph: data.graph });
+        })
+        .then(data => {
+            if (data.error) return { error: data.error };
+            return data.results;
         });
-
-    return results;
 }
 
