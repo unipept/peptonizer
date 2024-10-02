@@ -59,7 +59,11 @@ const startToPeptonize = async function() {
     document.getElementById("inputs").hidden = true;
     document.getElementById("loading-spinner").hidden = false;
 
-    const peptonizerResult = await peptonize(fileContents).then(js => JSON.parse(js));
+    const alphas = [0.2, 0.5, 0.8];
+    const betas = [0.2, 0.5, 0.8];
+    const priors = [0.2, 0.5];
+    const pepGMParams = { alphas, betas, priors };
+    const peptonizerResult = await peptonize(fileContents, pepGMParams).then(js => JSON.parse(js));
 
     console.log(peptonizerResult);
     const entries = Object.entries(peptonizerResult).map(([key, value]) => [key, parseFloat(value.toFixed(2))]);

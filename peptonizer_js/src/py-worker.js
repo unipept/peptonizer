@@ -36,12 +36,10 @@ for (let i = 0; i < numWorkers; i++) {
     let worker = new Worker("./workers/execute_pepgm_worker.js");
     worker.onmessage = (event) => {
         const { id, ...data } = event.data;
-        console.log(event.data);
         const onSuccess = callbacks[id];
         delete callbacks[id];
         
         aggregateResult(data);
-        console.log(result);
         tasksDone ++;
         if (tasksDone == tasksAmount) {
             onSuccess(result);
@@ -50,12 +48,11 @@ for (let i = 0; i < numWorkers; i++) {
     executePepgmWorkers.push(worker);
 }
 
-const alphas = [0.2, 0.5, 0.8];
-const betas = [0.2, 0.5, 0.8];
-const priors = [0.2, 0.5];
 let tasksAmount = 0;
 const asyncPepgmExecution = (() => {
     return (context) => {
+        const { graph, alphas, betas, priors } = context;
+
         return new Promise((onSuccess) => {
             alphas.forEach((alpha, i, as) => {
                 betas.forEach((beta, j, bs) => {
@@ -63,7 +60,7 @@ const asyncPepgmExecution = (() => {
                         id = (id + 1) % Number.MAX_SAFE_INTEGER;
                         callbacks[id] = onSuccess;
                         executePepgmWorkers[tasksAmount % numWorkers].postMessage({
-                            ...context,
+                            graph,
                             id,
                             alpha,
                             beta,
