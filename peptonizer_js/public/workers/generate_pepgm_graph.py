@@ -72,4 +72,4 @@ for name, size in sorted(((name, getsizeof(value)) for name, value in list(
         locals().items())), key=lambda x: -x[1])[:10]:
     print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
 
-json.dumps(pepgm_graph)
+pepgm_graph.to_graph_ml()

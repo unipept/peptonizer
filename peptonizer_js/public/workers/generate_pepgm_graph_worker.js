@@ -19,7 +19,7 @@ self.onmessage = async (event) => {
     // make sure loading is done
     await pyodideReadyPromise;
     // Don't bother yet with this line, suppose our API is built in such a way:
-    const { id, psms } = event.data;
+    const { psms, id } = event.data;
 
     console.log(event.data);
 
@@ -27,11 +27,12 @@ self.onmessage = async (event) => {
     try {
         pyodide.globals.set('input', psms);
 
-        const peptonizer_code = await (await fetch('./generate_pepgm_graph.py')).text();
-        // Run the Python code with Pyodide
-        let results = await self.pyodide.runPythonAsync(peptonizer_code);
-        self.postMessage({ results, id });
+        let results = await fetch('./generate_pepgm_graph.py')
+                            .then(x => x.text())
+                            .then(code => self.pyodide.runPythonAsync(code))
+                            
+        self.postMessage({ id: id, graph: results });
     } catch (error) {
-        self.postMessage({ error: error.message, id });
+        self.postMessage({ error: error.message, id: id });
     }
 };

@@ -4,13 +4,7 @@ async function loadPyodideAndPackages() {
     self.pyodide = await loadPyodide();
     // Load all packages into the Pyodide runtime environment that are required by the Peptonizer
     await self.pyodide.loadPackage([
-        'numpy',
-        'scipy',
-        'networkx',
-        'pandas',
-        'micropip',
-        'requests',
-        'openssl'
+        'numpy'
     ]);
 }
 let pyodideReadyPromise = loadPyodideAndPackages();
@@ -31,11 +25,14 @@ self.onmessage = async (event) => {
         pyodide.globals.set('beta', beta);
         pyodide.globals.set('prior', prior);
 
-        const peptonizer_code = await (await fetch('./execute_pepgm.py')).text();
-        // Run the Python code with Pyodide
-        let results = await self.pyodide.runPythonAsync(peptonizer_code);
+        let results = await fetch('./execute_pepgm.py')
+                            .then(x => x.text())
+                            .then(code => self.pyodide.runPythonAsync(code));
+        
+        console.log(results);
         self.postMessage({ results, id });
     } catch (error) {
+        console.error(error);
         self.postMessage({ error: error.message, id });
     }
 };

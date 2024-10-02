@@ -1,4 +1,4 @@
-import { asyncPepgmGraphGeneration, asyncPepgmExecution } from "./py-worker";
+import { pepgmGraphGeneration, asyncPepgmExecution } from "./py-worker";
 
 /**
  * Start the peptonizer. This function takes in a PSM-file that has been read in earlier (so no file paths here). The
@@ -9,23 +9,14 @@ import { asyncPepgmGraphGeneration, asyncPepgmExecution } from "./py-worker";
  * @return Mapping between NCBI taxon IDs (integer, > 0) and probabilities (float in [0, 1]).
  */
 export async function peptonize(psmContent) {
-    const data = await (await fetch("data/rescored_medium.psms.tsv")).text();
-
-    console.log("Before graph generation")
-    const { graph, generation_error } = await asyncPepgmGraphGeneration( {
-        psms: data
-    });
-
-    console.log("Before graph execution")
-    const { results, error } = asyncPepgmExecution( {
-        graph: graph
-    });
-
-    console.log("Possible errors: ");
-    console.log(error);
-
-    console.log("Final output from the PeptonizerJS: ")
-    console.log(results);
+    const { results, error } = 
+        await fetch("/data/rescored_small.psms.tsv")
+        .then(x => x.text())
+        .then(data => pepgmGraphGeneration({ psms: data }))
+        .then(data => {
+            if (data.error) return { error: data.error };
+            asyncPepgmExecution({ graph: data.graph });
+        });
 
     return results;
 }
