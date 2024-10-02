@@ -4,7 +4,8 @@ async function loadPyodideAndPackages() {
     self.pyodide = await loadPyodide();
     // Load all packages into the Pyodide runtime environment that are required by the Peptonizer
     await self.pyodide.loadPackage([
-        'numpy'
+        'micropip',
+        'requests',
     ]);
 }
 let pyodideReadyPromise = loadPyodideAndPackages();
@@ -28,11 +29,9 @@ self.onmessage = async (event) => {
         let results = await fetch('./execute_pepgm.py')
                             .then(x => x.text())
                             .then(code => self.pyodide.runPythonAsync(code));
-        
-        console.log(results);
+
         self.postMessage({ results, id });
     } catch (error) {
-        console.error(error);
         self.postMessage({ error: error.message, id });
     }
 };

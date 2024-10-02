@@ -15,7 +15,7 @@ export async function peptonize(psmContent) {
         .then(data => pepgmGraphGeneration({ psms: data }))
         .then(data => {
             if (data.error) return { error: data.error };
-            asyncPepgmExecution({ graph: data.graph });
+            return asyncPepgmExecution({ graph: data.graph });
         });
 
     return results;

@@ -29,7 +29,7 @@ self.onmessage = async (event) => {
 
         let results = await fetch('./generate_pepgm_graph.py')
                             .then(x => x.text())
-                            .then(code => self.pyodide.runPythonAsync(code))
+                            .then(code => self.pyodide.runPythonAsync(code));
                             
         self.postMessage({ id: id, graph: results });
     } catch (error) {

@@ -28,14 +28,14 @@ const num_workers = 4
 const executePepgmWorkers = []
 for (let i = 0; i < num_workers; i++) {
     let worker = new Worker("./workers/execute_pepgm_worker.js");
-    executePepgmWorkers.push(worker);
-
     worker.onmessage = (event) => {
         const { id, ...data } = event.data;
+        console.log(event.data);
         const onSuccess = callbacks[id];
         delete callbacks[id];
         onSuccess(data);
     };
+    executePepgmWorkers.push(worker);
 }
 
 const alphas = [0.2, 0.5, 0.8];
@@ -45,7 +45,16 @@ const asyncPepgmExecution = (() => {
     return (context) => {
         return new Promise((onSuccess) => {
             let workerId = 0;
-            alphas.forEach((alpha, i, as) => {
+            id = (id + 1) % Number.MAX_SAFE_INTEGER;
+            callbacks[id] = onSuccess;
+            executePepgmWorkers[workerId % num_workers].postMessage({
+                ...context,
+                id,
+                alpha: 0.2,
+                beta: 0.2,
+                prior: 0.2
+            });
+            /*alphas.forEach((alpha, i, as) => {
                 betas.forEach((beta, j, bs) => {
                     priors.forEach((prior, k, ps) => {
                         id = (id + 1) % Number.MAX_SAFE_INTEGER;
@@ -60,7 +69,7 @@ const asyncPepgmExecution = (() => {
                         workerId ++;
                     });
                 });
-            });
+            });*/
         });
     };
 })();
