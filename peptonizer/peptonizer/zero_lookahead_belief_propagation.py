@@ -54,7 +54,7 @@ class Messages:
         # Maps a node ID onto its current belief value
         self.current_beliefs: List[npt.NDArray[np.float64]] = []
 
-        # Incomming messages for each node
+        # Incoming messages for each node
         self.msg_in: List[List[npt.NDArray[np.float64]]] = []
         self.msg_in_new: List[List[npt.NDArray[np.float64]]] = []
         self.msg_in_log: List[List[npt.NDArray[np.float64]]] = []
