@@ -25,8 +25,10 @@ self.onmessage = async (event) => {
 
     // Now is the easy part, the one that is similar to working in the main thread:
     try {
+        // Set inputs for python code.
         pyodide.globals.set('input', psms);
 
+        // Fetch the python code and execute it with Pyodide.
         let results = await fetch('./generate_pepgm_graph.py')
                             .then(x => x.text())
                             .then(code => self.pyodide.runPythonAsync(code));
