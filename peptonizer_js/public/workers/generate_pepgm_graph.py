@@ -37,39 +37,4 @@ print("Start creation of PepGM graph...")
 pepgm_graph = peptonizer.generate_pepgm_graph(taxa_weights_df)
 print("Successfully created PepGM graph...")
 
-
-def sizeof_fmt(num, suffix='B'):
-    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f %s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
-for name, size in sorted(((name, getsizeof(value)) for name, value in list(
-        locals().items())), key=lambda x: -x[1])[:10]:
-    print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
-
-print("Freeing up memory...")
-del taxa_weights_df
-del unipept_responses
-del parsed_input
-del input
-del psms
-del _
-gc.collect()
-
-
-def sizeof_fmt(num, suffix='B'):
-    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
-        if abs(num) < 1024.0:
-            return "%3.1f %s%s" % (num, unit, suffix)
-        num /= 1024.0
-    return "%.1f %s%s" % (num, 'Yi', suffix)
-
-
-for name, size in sorted(((name, getsizeof(value)) for name, value in list(
-        locals().items())), key=lambda x: -x[1])[:10]:
-    print("{:>30}: {:>8}".format(name, sizeof_fmt(size)))
-
 pepgm_graph.to_graph_ml()

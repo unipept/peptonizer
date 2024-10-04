@@ -12,6 +12,7 @@
     "vite": "^5.3.4"
   },
   "dependencies": {
-    "pyodide": "^0.26.1"
+    "pyodide": "^0.26.1",
+    "async": "^3.2.4"
   }
 }

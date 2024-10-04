@@ -1,4 +1,5 @@
-import { pepgmGraphGeneration, asyncPepgmExecution } from "./py-worker";
+import { pepgmGraphGeneration } from "./py-worker-generation";
+import { asyncPepgmExecution } from "./py-worker-execution";
 
 /**
  * Start the peptonizer. This function takes in a PSM-file that has been read in earlier (so no file paths here). The
