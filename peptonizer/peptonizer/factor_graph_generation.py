@@ -179,6 +179,9 @@ class CTFactorGraph(FactorGraph):
     def save_to_graph_ml(self, filename):
         nx.write_graphml(self, filename)
 
+    def to_graph_ml(self):
+        return '\n'.join(nx.generate_graphml(self))
+
     def compute_network_attributes(self):
         """
         Computes nodes attributes using builtin networkx functions
