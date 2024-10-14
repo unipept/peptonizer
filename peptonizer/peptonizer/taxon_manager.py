@@ -4,6 +4,7 @@ import requests
 from typing import List, Dict
 from sys import getsizeof
 
+from .request_manager import RequestManager
 
 class TaxonManager:
     UNIPEPT_URL = "http://api.unipept.ugent.be"
@@ -77,7 +78,7 @@ class TaxonManager:
             }
 
             # Perform the HTTP POST request
-            response = requests.post(url, json=payload)
+            response = RequestManager.perform_post_request(url, payload)
 
             # Check if the request was successful
             if response.status_code == 200:
@@ -113,7 +114,8 @@ class TaxonManager:
                 "extra": True
             }
 
-            response = requests.post(url, json=payload)
+            # Perform the HTTP POST request
+            response = RequestManager.perform_post_request(url, payload)
 
             if response.status_code == 200:
                 data = response.json()
@@ -156,7 +158,7 @@ class TaxonManager:
             }
 
             # Perform the HTTP POST request
-            response = requests.post(url, json=payload)
+            response = RequestManager.perform_post_request(url, payload)
 
             # Check if the request was successful
             if response.status_code == 200:

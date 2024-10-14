@@ -3,6 +3,7 @@ import logging
 
 from typing import Dict, Tuple, List, Any
 
+from .request_manager import RequestManager
 from .taxon_manager import TaxonManager
 
 UNIPEPT_URL = "https://api.unipept.ugent.be"
@@ -36,7 +37,7 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
         }
 
         # Perform the HTTP POST request
-        response = requests.post(url, json=payload)
+        response = RequestManager.perform_post_request(url, payload)
 
         # Check if the request was successful
         if response.status_code == 200:
