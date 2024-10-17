@@ -5,11 +5,15 @@ await micropip.install("/lib/peptonizer-0.1-py3-none-any.whl")
 
 import peptonizer
 
+# Provided by Pyodide
+from js import postMessage
+
 print("Started running PepGM...")
 graph = globals().get('graph')
 alpha = globals().get('alpha')
 beta = globals().get('beta')
 prior = globals().get('prior')
+
 
 pepgm_results = peptonizer.run_belief_propagation(
     graph,

@@ -62,11 +62,16 @@ const startToPeptonize = async function() {
     const alphas = [0.2, 0.5, 0.8];
     const betas = [0.2, 0.5, 0.8];
     const priors = [0.2, 0.5];
-    const pepGMParams = { alphas, betas, priors };
-    const peptonizerResult = await peptonize(fileContents, pepGMParams).then(js => JSON.parse(js));
+
+    const peptonizerResult = await peptonize(
+        fileContents,
+        alphas,
+        betas,
+        priors
+    );
 
     console.log(peptonizerResult);
-    const entries = Object.entries(peptonizerResult).map(([key, value]) => [key, parseFloat(value.toFixed(2))]);
+    const entries = Object.entries(peptonizerResult[0]).map(([key, value]) => [key, parseFloat(value.toFixed(2))]);
     const sortedEntries = entries.sort((a, b) => b[1] - a[1]);
 
 
