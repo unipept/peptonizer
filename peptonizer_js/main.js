@@ -29,6 +29,10 @@ document.querySelector('#app').innerHTML = `
       <div id="loading-spinner" hidden>
           <div class="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
           <div>Processing...</div>
+          <div id="grid-progress-view"></div>
+          <div id="graph-progress-view"></div>
+          <div id="iterations-progress-view"></div>
+          <div id="residual-progress-view"></div>
       </div>
       <div id="result-view" hidden>
           <h2>Final output</h2>
@@ -54,6 +58,37 @@ document.getElementById('file-input').addEventListener('change', (event) => {
 });
 
 
+class ProgressListener {
+    constructor(
+        gridProgressEl,
+        graphProgressEl,
+        iterationsProgressEl,
+        residualProgressEl
+    ) {
+        this.gridProgressEl = gridProgressEl;
+        this.graphProgressEl = graphProgressEl;
+        this.iterationsProgressEl = iterationsProgressEl;
+        this.residualProgressEl = residualProgressEl;
+    }
+
+    gridUpdated(currentAlpha, currentBeta, currentPrior) {
+        this.gridProgressEl.innerHTML = `Currently training graph with parameters α = ${currentAlpha}, β = ${currentBeta}, γ = ${currentPrior}.`
+    }
+
+    graphsUpdated(currentGraph, totalGraphs) {
+        this.graphProgressEl.innerHTML = `Finished processing graph ${currentGraph} / ${totalGraphs}`;
+    }
+
+    maxResidualUpdated(maxResidual, tolerance) {
+        this.residualProgressEl.innerHTML = `Improved maximum residual metric to ${maxResidual}. Tolerance is ${tolerance}`;
+    }
+
+    iterationsUpdated(currentIteration, totalIterations) {
+        this.iterationsProgressEl.innerHTML = `Finished iteration ${currentIteration} / ${totalIterations}.`;
+    }
+}
+
+
 const startToPeptonize = async function() {
     document.getElementById("result-view").hidden = true;
     document.getElementById("inputs").hidden = true;
@@ -67,7 +102,12 @@ const startToPeptonize = async function() {
         fileContents,
         alphas,
         betas,
-        priors
+        priors,
+        new ProgressListener(
+            document.getElementById("graph-progress-view"),
+            document.getElementById("iterations-progress-view"),
+            document.getElementById("residual-progress-view"),
+        )
     );
 
     console.log(peptonizerResult);

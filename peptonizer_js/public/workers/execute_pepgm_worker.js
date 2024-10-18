@@ -26,14 +26,15 @@ self.onmessage = async (event) => {
         pyodide.globals.set('alpha', alpha);
         pyodide.globals.set('beta', beta);
         pyodide.globals.set('prior', prior);
+        pyodide.globals.set('execution_id', id);
 
         // Fetch the python code and execute it with Pyodide.
         let results = await fetch('./execute_pepgm.py')
                             .then(x => x.text())
                             .then(code => self.pyodide.runPythonAsync(code));
 
-        self.postMessage({ results, id });
+        self.postMessage(JSON.stringify({ type: "result", result: results, id }));
     } catch (error) {
-        self.postMessage({ error: error.message, id });
+        self.postMessage(JSON.stringify({ type: "error", error: error.message, id }));
     }
 };

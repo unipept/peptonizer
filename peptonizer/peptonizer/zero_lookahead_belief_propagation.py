@@ -610,7 +610,7 @@ def run_belief_propagation(
         prior: float,
         max_iter: int = 10000,
         tol: float = 0.006,
-        progress_listener: ZeroLookaheadProgressListener = PrintZeroLookaheadProgressListener
+        progress_listener: ZeroLookaheadProgressListener = PrintZeroLookaheadProgressListener()
     ):
     """
     Runs the belief propagation algorithm on a graph that's represented by the string in graphml_content with the

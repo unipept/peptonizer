@@ -1,5 +1,5 @@
-import { GraphGenerationWorkerPool } from "./graph_generation_worker_pool.js";
-import { GridSearchWorkerPool } from "./grid_search_worker_pool.js";
+import { GraphGenerationWorkerPool } from "./GraphGenerationWorkerPool.js";
+import { GridSearchWorkerPool } from "./GridSearchWorkerPool.js";
 
 /**
  * Start the peptonizer. This function takes in a PSM-file that has been read in earlier (so no file paths here). The
@@ -13,13 +13,15 @@ import { GridSearchWorkerPool } from "./grid_search_worker_pool.js";
  * detecting a peptide at random.
  * @param priors An array of possible values for the gamma (or prior) parameter. Gamma indicates the prior probability
  * of a taxon being present.
+ * @param progressListener Is called everytime the progress of the belief propagation algorithm has been updated.
  * @return Mapping between NCBI taxon IDs (integer, > 0) and probabilities (float in [0, 1]).
  */
 export async function peptonize(
     psmContent,
     alphas,
     betas,
-    priors
+    priors,
+    progressListener
 ) {
     // First, we've got to generate the PepGM factor graph itself.
     const generatedGraph = await GraphGenerationWorkerPool.generatePepGmGraph(psmContent);
@@ -37,7 +39,8 @@ export async function peptonize(
         generatedGraph.graph,
         alphas,
         betas,
-        priors
+        priors,
+        progressListener
     );
 }
 

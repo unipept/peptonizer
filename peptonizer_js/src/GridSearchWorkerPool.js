@@ -17,10 +17,33 @@ class GridSearchWorkerPool {
 
             // Define what to do if a pepGM execution is done.
             worker.onmessage = (event) => {
-                const { id, ...data } = event.data;
-                const onSuccess = this.callbacks.get(id);
-                this.callbacks.delete(id);
-                onSuccess(data);
+                const {id, type, ...data} = JSON.parse(event.data);
+                const [onSuccess, onError, progressListener] = this.callbacks.get(id);
+
+                if (type === "result") {
+                    onSuccess(JSON.parse(data.result));
+                    this.callbacks.delete(id);
+                } else if (type === "progress") {
+                    if (data["progress_type"] === "graph") {
+                        progressListener.graphsUpdated(
+                            data["current_graph"],
+                            data["total_graphs"]
+                        );
+                    } else if (data["progress_type"] === "max_residual") {
+                        progressListener.maxResidualUpdated(
+                            data["max_residual"],
+                            data["tolerance"]
+                        );
+                    } else if (data["progress_type"] === "iterations") {
+                        progressListener.iterationsUpdated(
+                            data["current_iterations"],
+                            data["total_iterations"]
+                        )
+                    }
+                } else if (type === "error") {
+                    onError(data.error);
+                    this.callbacks.delete(id);
+                }
             };
 
             this.workers.push(worker);
@@ -33,9 +56,15 @@ class GridSearchWorkerPool {
 
                 if (worker) {
                     try {
-                        const result = await new Promise((onSuccess) => {
+                        const result = await new Promise((onSuccess, onError) => {
                             this.currentId = (this.currentId + 1) % Number.MAX_SAFE_INTEGER;
-                            this.callbacks.set(this.currentId, onSuccess);
+                            this.callbacks.set(
+                                this.currentId,
+                                [onSuccess, onError, task.progressListener]
+                            );
+                            task.progressListener.gridUpdated(task.alpha, task.beta, task.prior);
+                            // The progressListener itself cannot be sent to the worker!
+                            delete task.progressListener
                             worker.postMessage({...task, id: this.currentId});
                         });
 
@@ -62,9 +91,10 @@ class GridSearchWorkerPool {
      * @param alphas
      * @param betas
      * @param priors
+     * @param progressListener
      * @returns {Promise}
      */
-    static performGridSearch(graph, alphas, betas, priors) {
+    static performGridSearch(graph, alphas, betas, priors, progressListener) {
         return new Promise((resolve, reject) => {
             const results = [];
 
@@ -77,7 +107,8 @@ class GridSearchWorkerPool {
                             graph,
                             alpha,
                             beta,
-                            prior
+                            prior,
+                            progressListener
                         }, (result) => {
                             // Check if an error occurred. If so, stop running the grid search entirely.
                             if (result.error) {
@@ -86,7 +117,7 @@ class GridSearchWorkerPool {
                             }
 
                             // No error, continue and add the results to the output
-                            results.push(JSON.parse(result.results))
+                            results.push(result)
                         });
                     });
                 });
