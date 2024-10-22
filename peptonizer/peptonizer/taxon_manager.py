@@ -139,7 +139,7 @@ class TaxonManager:
         """
         Returns a mapping from taxon ID to taxon name for all taxa that have been provided to this function.
 
-         Parameters
+        Parameters
         ----------
         target_taxa: List[int],
             A list of taxon IDs for which all corresponding taxon names should be retrieved.

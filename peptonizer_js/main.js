@@ -29,6 +29,10 @@ document.querySelector('#app').innerHTML = `
       <div id="loading-spinner" hidden>
           <div class="lds-roller"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
           <div>Processing...</div>
+          <div id="grid-progress-view"></div>
+          <div id="graph-progress-view"></div>
+          <div id="iterations-progress-view"></div>
+          <div id="residual-progress-view"></div>
       </div>
       <div id="result-view" hidden>
           <h2>Final output</h2>
@@ -54,6 +58,37 @@ document.getElementById('file-input').addEventListener('change', (event) => {
 });
 
 
+class ProgressListener {
+    constructor(
+        gridProgressEl,
+        graphProgressEl,
+        iterationsProgressEl,
+        residualProgressEl
+    ) {
+        this.gridProgressEl = gridProgressEl;
+        this.graphProgressEl = graphProgressEl;
+        this.iterationsProgressEl = iterationsProgressEl;
+        this.residualProgressEl = residualProgressEl;
+    }
+
+    gridUpdated(currentAlpha, currentBeta, currentPrior) {
+        this.gridProgressEl.innerHTML = `Currently training graph with parameters α = ${currentAlpha}, β = ${currentBeta}, γ = ${currentPrior}.`
+    }
+
+    graphsUpdated(currentGraph, totalGraphs) {
+        this.graphProgressEl.innerHTML = `Finished processing graph ${currentGraph} / ${totalGraphs}`;
+    }
+
+    maxResidualUpdated(maxResidual, tolerance) {
+        this.residualProgressEl.innerHTML = `Improved maximum residual metric to ${maxResidual}. Tolerance is ${tolerance}`;
+    }
+
+    iterationsUpdated(currentIteration, totalIterations) {
+        this.iterationsProgressEl.innerHTML = `Finished iteration ${currentIteration} / ${totalIterations}.`;
+    }
+}
+
+
 const startToPeptonize = async function() {
     document.getElementById("result-view").hidden = true;
     document.getElementById("inputs").hidden = true;
@@ -62,11 +97,21 @@ const startToPeptonize = async function() {
     const alphas = [0.2, 0.5, 0.8];
     const betas = [0.2, 0.5, 0.8];
     const priors = [0.2, 0.5];
-    const pepGMParams = { alphas, betas, priors };
-    const peptonizerResult = await peptonize(fileContents, pepGMParams).then(js => JSON.parse(js));
+
+    const peptonizerResult = await peptonize(
+        fileContents,
+        alphas,
+        betas,
+        priors,
+        new ProgressListener(
+            document.getElementById("graph-progress-view"),
+            document.getElementById("iterations-progress-view"),
+            document.getElementById("residual-progress-view"),
+        )
+    );
 
     console.log(peptonizerResult);
-    const entries = Object.entries(peptonizerResult).map(([key, value]) => [key, parseFloat(value.toFixed(2))]);
+    const entries = Object.entries(peptonizerResult[0]).map(([key, value]) => [key, parseFloat(value.toFixed(2))]);
     const sortedEntries = entries.sort((a, b) => b[1] - a[1]);
 
 

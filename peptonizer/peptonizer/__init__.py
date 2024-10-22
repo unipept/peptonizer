@@ -1,4 +1,4 @@
-from .zero_lookahead_belief_propagation import run_belief_propagation
+from .zero_lookahead_belief_propagation import run_belief_propagation, ZeroLookaheadProgressListener
 from .plot_results import plot_peptonizer_results
 from .parsers import parse_pout, parse_ms2rescore_output
 from .unipept_get_taxonomy_from_pout import fetch_unipept_taxon_information

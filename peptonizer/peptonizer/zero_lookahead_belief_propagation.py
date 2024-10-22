@@ -9,6 +9,86 @@ from .factor_graph_generation import *
 from .pqdict import pqdict
 from typing import Dict, Any, List, Tuple, Iterator
 
+
+class ZeroLookaheadProgressListener:
+    def graphs_updated(
+        self,
+        current_graph: int,
+        total_graphs: int
+    ):
+        """
+        Called when the belief propagation algorithm is started on a new subgraph.
+
+        Parameters
+        ----------
+        current_graph: int
+            Which subgraph in the whole factor graph the belief propagation algorithm is started for.
+        total_graphs: int
+            The total amount of subgraphs (or communities) that are present in the whole factor graph.
+        """
+        pass
+
+    def max_residual_updated(
+        self,
+        max_residual: float,
+        tolerance: float
+    ):
+        """
+        Called when a new, better max_residual score has been found by the belief propagation algorithm.
+
+        Parameters
+        ----------
+        max_residual: float
+            The new max_residual score that has been found (will thus be lower than the previous one)
+        tolerance: float
+            The minimum residual score required for the convergence of the belief propagation algorithm to be considered
+            complete.
+        """
+        pass
+
+    def iterations_updated(
+        self,
+        current_iteration: int,
+        total_iterations: int,
+    ):
+        """
+        Called everytime the belief propagation algorithm has finished processing one or more complete iterations of the
+        message loop.
+
+        Parameters
+        ----------
+        current_iteration: int
+            The current iteration for which execution has just completed.
+        total_iterations: int
+            The maximum amount of iterations that will be performed before the belief propagation algorithm is stopped.
+            Note that the algorithm can be stopped earlier if convergence has already been achieved.
+        """
+        pass
+
+
+class PrintZeroLookaheadProgressListener(ZeroLookaheadProgressListener):
+    def graphs_updated(
+            self,
+            current_graph: int,
+            total_graphs: int
+    ):
+        print(f"Finished calibration of {current_graph} of {total_graphs}")
+
+    def max_residual_updated(
+            self,
+            max_residual: float,
+            tolerance: float
+    ):
+        print(f"Improved maximum residual to {max_residual}. Convergence is met when lower than {tolerance}.")
+
+    def iterations_updated(
+            self,
+            current_iteration: int,
+            total_iterations: int,
+    ):
+        print(f"Finished message loop iteration {current_iteration} / {total_iterations}.")
+
+
 class Category(Enum):
     peptide = 0
     factor = 1
@@ -372,30 +452,33 @@ class Messages:
         self.max_val = self.priorities.top()
         return self.max_val
 
-    def zero_look_ahead_loopy_loop(self, max_loops: int, tolerance: float, local: bool = False) -> Dict[str, npt.NDArray[np.float64]]:
+    def zero_look_ahead_loopy_loop(
+            self,
+            max_loops: int,
+            tolerance: float,
+            progress_listener: ZeroLookaheadProgressListener
+    ) -> Dict[str, npt.NDArray[np.float64]]:
         """
         Run the zero-look-ahead belief propagation algorithm.
         :param max_loops: int, maximum number of iterations in case of non-convergence
         :param tolerance: float, tolerance for convergence check
-        :param local: Bool, parameter passed to Computed Update function
+        :param progress_listener: ZeroLookaheadProgressListener, progress listener that waits for updates from the running
+            belief propagation algorithm.
         """
 
         max_residual = 100
 
         # first, do 5 loops where I update all messages
-        print(f"Time spent in loop 0/{max_loops}: 0s")
+        progress_listener.iterations_updated(0, max_loops)
         for k in range(0, 5):
-            start_t = time.time()
             self.compute_update()
             self.msg_in_log = [msg_in.copy() for msg_in in self.msg_in]
             self.msg_in = [msg_in.copy() for msg_in in self.msg_in_new]
-            k += 1
-            end_t = time.time()
-            print(f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s")
+
+            progress_listener.iterations_updated(k, max_loops)
 
         # compute all residuals after 5 runs once (= initialize the residual/priorities vectors)
         residuals = [(edge_id, self.compute_infinity_norm_residual(*edge)) for edge_id, edge in enumerate(self.edges)]
-        print(f"Total residuals length: {len(residuals)}, size in bytes: {getsizeof(residuals)}")
 
         # set the priority vector once with copy of the previously calculated residuals
         self.priorities = pqdict(residuals, reverse=True)
@@ -404,10 +487,9 @@ class Messages:
 
         # keep track of the nodes of which the incoming messages have changed
         prev_changed = [i for i in range(len(self.msg_in))]
-        print(f"\rTime spent in loop 0/{max_loops}: 0s -> residual max 0", end="")
+
         while k < max_loops and max_residual > tolerance:
             # actual zero-look-ahead-BP part
-            start_t = time.time()
             priority_message_edge_id = self.get_priority_message()
             max_residual = self.priorities[priority_message_edge_id]
             (start_node, end_node) = self.edges[priority_message_edge_id]
@@ -435,19 +517,12 @@ class Messages:
             )
             self.compute_priority(priority_message_edge_id)
 
-            end_t = time.time()
-
-            # Only update the time per loop every 5 iterations
+            # Try not to overwhelm the progress listener with too many messages. That's why only every 5th iteration
+            # will be reported.
             if k % 5 == 0:
-                print(
-                    f"\rTime spent in loop {k}/{max_loops}: {(end_t - start_t):.3f}s -> residual max {max_residual:.3f}",
-                    end="")
+                progress_listener.iterations_updated(k, max_loops)
 
             k += 1
-
-        print()
-
-        print("Total residuals with value zero: " + str(len([x for x in self.total_residuals if x == 0])))
 
         # marginalize once the model has converged
         for (node_id, node_category) in enumerate(self.categories):
@@ -480,27 +555,36 @@ class Messages:
 
 
 # calibration through message passing of all subgraphs in the List of factor graphs
-def calibrate_all_subgraphs(list_of_ct_factor_graphs: List[CTFactorGraph], max_iterations: int, tolerance: float, local: bool = False) -> Tuple[Dict[str, npt.NDArray[np.float64]], Dict[str, str]]:
+def calibrate_all_subgraphs(
+        list_of_ct_factor_graphs: List[CTFactorGraph],
+        max_iterations: int,
+        tolerance: float,
+        progress_listener: ZeroLookaheadProgressListener
+) -> Tuple[Dict[str, npt.NDArray[np.float64]], Dict[str, str]]:
     """
     Performs bayesian inference through loopy belief propagation, returns dictionary {variable:posterior_probability}
     :param list_of_ct_factor_graphs: list, contains FactorGraph objects on which inference can be performed
     :param max_iterations: int, max number of iterations in case of non-convergence
     :param tolerance: float, error tolerance between messages for convergence criterion
-    :param local: Bool, whether loops are calculated locally
+    :param progress_listener: ZeroLookaheadProgressListener, progress listener that waits for updates from the running
+        belief propagation algorithm.
     """
 
     results_dict: Dict[str, npt.NDArray[np.float64]] = {}
     node_category_dict: Dict[str, str] = {}
 
+    progress_listener.graphs_updated(0, len(list_of_ct_factor_graphs))
     for (idx, graph) in enumerate(list_of_ct_factor_graphs):
-        print(f"Started calibrating graph {idx + 1} of {len(list_of_ct_factor_graphs)}")
         if graph.number_of_nodes() > 2:
             node_category_dict.update(dict(graph.nodes(data="category")))
             initialized_message_object = Messages(graph)
             current_beliefs = initialized_message_object.zero_look_ahead_loopy_loop(
-                max_iterations, tolerance, local
+                max_iterations,
+                tolerance,
+                progress_listener
             )
             results_dict.update(current_beliefs)
+        progress_listener.graphs_updated(idx + 1, len(list_of_ct_factor_graphs))
     return results_dict, node_category_dict
 
 
@@ -525,7 +609,8 @@ def run_belief_propagation(
         regularized: bool,
         prior: float,
         max_iter: int = 10000,
-        tol: float = 0.006
+        tol: float = 0.006,
+        progress_listener: ZeroLookaheadProgressListener = PrintZeroLookaheadProgressListener()
     ):
     """
     Runs the belief propagation algorithm on a graph that's represented by the string in graphml_content with the
@@ -544,7 +629,10 @@ def run_belief_propagation(
     ]
 
     results_dict, node_types = calibrate_all_subgraphs(
-        ct_factor_graphs, max_iter, tol
+        ct_factor_graphs,
+        max_iter,
+        tol,
+        progress_listener
     )
 
     return convert_results_to_csv(results_dict, node_types)
