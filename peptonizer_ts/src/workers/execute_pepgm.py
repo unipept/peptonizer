@@ -1,7 +1,4 @@
 import json
-import micropip
-
-await micropip.install("/lib/peptonizer-0.1-py3-none-any.whl")
 
 import peptonizer
 
