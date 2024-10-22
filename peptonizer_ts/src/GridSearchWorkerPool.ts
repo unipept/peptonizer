@@ -17,7 +17,7 @@ class GridSearchWorkerPool {
     static currentId = 0;
 
     // Maximum amount of workers that are allowed to be run in parallel (using multiple CPU cores).
-    static numberOfWorkers = 4;
+    static numberOfWorkers = 1;
     static workers: Worker[] = [];
 
     static queue;
@@ -25,7 +25,7 @@ class GridSearchWorkerPool {
     // Properly initialize the array of workers and their logic required to handle their asynchronous nature.
     static {
         for (let i = 0; i < this.numberOfWorkers; i++) {
-            let worker = new Worker("./workers/execute_pepgm_worker.js");
+            const worker = new Worker(new URL('./workers/ExecutePepGMWorker.ts', import.meta.url), { type: 'module' });
 
             // Define what to do if a pepGM execution is done.
             worker.onmessage = (event) => {

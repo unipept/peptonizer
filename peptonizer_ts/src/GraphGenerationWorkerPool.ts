@@ -3,7 +3,7 @@
  * propagation algorithm.
  */
 class GraphGenerationWorkerPool {
-    static worker = new Worker("./workers/generate_pepgm_graph_worker.js");
+    static worker = new Worker(new URL('./workers/GeneratePepGMGraphWorker.ts', import.meta.url), { type: 'module' });
     static callbacks = new Map();
     static currentId = 0;
 

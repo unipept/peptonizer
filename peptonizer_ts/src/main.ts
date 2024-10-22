@@ -157,7 +157,7 @@ const startToPeptonize = async function() {
         alphas,
         betas,
         priors,
-        new ProgressListener(document.getElementById("progress-view")!, 4)
+        new ProgressListener(document.getElementById("progress-view")!, 1)
     );
 
     console.log(peptonizerResult);

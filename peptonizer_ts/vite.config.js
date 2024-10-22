@@ -4,6 +4,7 @@ import { join } from "path";
 import path from "path";
 
 export default defineConfig({
+    assetsInclude: ['**/*.py', '**/*.whl'],
     lib: {
         entry: path.resolve(__dirname, 'src/index.ts'), // Change this to your library's entry point
         name: 'Peptonizer', // The global variable name for IIFE/UMD builds
