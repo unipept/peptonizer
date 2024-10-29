@@ -1,5 +1,6 @@
 import async from "async";
 import { GridSearchProgressListener } from "./GridSearchProgressListener.ts";
+import ExecutePepGMWorker from './workers/ExecutePepGMWorker.ts?worker&inline';
 
 type BeliefPropagationTask = {
     graph: string,
@@ -25,7 +26,7 @@ class GridSearchWorkerPool {
     // Properly initialize the array of workers and their logic required to handle their asynchronous nature.
     static {
         for (let i = 0; i < this.numberOfWorkers; i++) {
-            const worker = new Worker(new URL('./workers/ExecutePepGMWorker.ts', import.meta.url), { type: 'module' });
+            const worker = new ExecutePepGMWorker();
 
             // Define what to do if a pepGM execution is done.
             worker.onmessage = (event) => {

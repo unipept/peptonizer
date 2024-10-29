@@ -45,8 +45,6 @@ class Peptonizer {
             progressListener
         );
     }
-
-
 }
 
 export { Peptonizer };

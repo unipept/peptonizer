@@ -17,7 +17,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML= `
         <div style="margin: 16px;">
             <span>1. Upload a PSM file</span>
             <label for="file-input" class="file-label">⇪ Choose PSM File</label>
-            <input type="file" id="file-input" accept=".tsv" />
+            <input type="file" id="file-input" accept=".tsv,.txt" />
             <div id="file-input-label"></div>
         </div>
                

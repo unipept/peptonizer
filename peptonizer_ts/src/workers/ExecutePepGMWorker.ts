@@ -1,9 +1,9 @@
+console.log("Execute pepGM worker script...");
+
 // Import Pyodide
 import { loadPyodide, PyodideInterface } from 'pyodide';
 import pythonCode from "./execute_pepgm.py?raw";
-// @ts-ignore
-import peptonizerWhl from "./lib/peptonizer-0.1-py3-none-any.whl";
-
+import peptonizerWhlBase64 from "./lib/peptonizer_base64.whl?raw";
 
 // Extend the DedicatedWorkerGlobalScope to include the pyodide property
 interface DedicatedWorkerGlobalScope {
@@ -22,7 +22,7 @@ declare const self: DedicatedWorkerGlobalScope & typeof globalThis;
 
 async function loadPyodideAndPackages(): Promise<void> {
     self.pyodide = await loadPyodide({
-        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.2/full/'
+        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.3/full/'
     });
     // Load all packages into the Pyodide runtime environment that are required by the Peptonizer
     await self.pyodide.loadPackage([
@@ -32,14 +32,33 @@ async function loadPyodideAndPackages(): Promise<void> {
 
     // Use the imported .whl file URL directly with micropip
     await self.pyodide.runPythonAsync(`
+        import base64
+        from pathlib import Path
+        
         import micropip
-        await micropip.install("${peptonizerWhl}")
+
+        # Decode base64 string to binary and write to a temporary file
+        wheel_data = "${peptonizerWhlBase64}"
+        wheel_binary = base64.b64decode(wheel_data)
+        
+        # Define a temporary path for the .whl file
+        wheel_path = Path("/tmp/peptonizer-0.1-py3-none-any.whl")
+        wheel_path.write_bytes(wheel_binary)
+
+        # Install the wheel package
+        await micropip.install("emfs:///tmp/peptonizer-0.1-py3-none-any.whl")
+
+        # Clean up by deleting the temporary file
+        wheel_path.unlink()
     `);
+    console.log("Loaded pyodide and packages in ExecutePepGMWorker!");
 }
 
 let pyodideReadyPromise: Promise<void> = loadPyodideAndPackages();
 
 self.onmessage = async (event: MessageEvent<EventData>): Promise<void> => {
+    console.log("Received message in execute pepgm worker...");
+
     // Ensure that loading is complete
     await pyodideReadyPromise;
 
@@ -64,3 +83,5 @@ self.onmessage = async (event: MessageEvent<EventData>): Promise<void> => {
         self.postMessage(JSON.stringify({ type: "error", error: error.message, id }));
     }
 };
+
+console.log(self.onmessage);

@@ -1,8 +1,12 @@
 {
-  "name": "peptonizer_ts",
+  "name": "peptonizer",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.6",
   "type": "module",
+  "files": [
+    "dist"
+  ],
+  "module": "./dist/peptonizer.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -15,6 +19,6 @@
   "dependencies": {
     "@types/async": "^3.2.24",
     "async": "^3.2.6",
-    "pyodide": "^0.26.2"
+    "pyodide": "^0.26.3"
   }
 }
