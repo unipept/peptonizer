@@ -1,5 +1,3 @@
-console.log("Execute pepGM worker script...");
-
 // Import Pyodide
 import { loadPyodide, PyodideInterface } from 'pyodide';
 import pythonCode from "./execute_pepgm.py?raw";
