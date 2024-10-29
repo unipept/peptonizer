@@ -4,6 +4,8 @@ logs/
 benchmarks/
 initial_benchmarks/
 
+.DS_Store
+
 .idea/
 *.iml
 
