@@ -1,11 +1,3 @@
-import micropip
-import json
-import gc
-
-from sys import getsizeof
-
-await micropip.install("/lib/peptonizer-0.1-py3-none-any.whl")
-
 import peptonizer
 
 # The PSM input should be provided to the parser as a list of strings

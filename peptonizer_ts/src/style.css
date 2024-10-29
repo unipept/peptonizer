@@ -52,7 +52,7 @@ h1 {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
 .logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #f7df1eaa);
+  filter: drop-shadow(0 0 2em #646cffaa);
 }
 
 .card {
@@ -210,5 +210,12 @@ button:focus-visible {
 
 .file-label:hover {
   border-color: #646cff;
+}
+
+.worker-status {
+  border: 1px solid gray;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px;
 }
 
