@@ -27,7 +27,7 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
 
     # Split the peptides into batches of 100
     for i in range(0, len(peptides), UNIPEPT_PEPTIDES_BATCH_SIZE):
-        print(f"Now querying Unipept with batch {(i // UNIPEPT_PEPTIDES_BATCH_SIZE) + 1} out of {batches}.")
+        print(f"Now querying Unipept with batch {(i // UNIPEPT_PEPTIDES_BATCH_SIZE) + 1} out of {batches + 1}.")
         batch = peptides[i:i+UNIPEPT_PEPTIDES_BATCH_SIZE]
 
         # Prepare the request payload
