@@ -1,7 +1,7 @@
 // Import Pyodide
 import { loadPyodide, PyodideInterface } from 'pyodide';
 import pythonCode from "./execute_pepgm.py?raw";
-import peptonizerWhlBase64 from "./lib/peptonizer_base64.whl?raw";
+import peptonizerWhlBase64 from "./lib/peptonizer-0.1-py3-none-any.base64.whl?raw";
 
 // Extend the DedicatedWorkerGlobalScope to include the pyodide property
 interface DedicatedWorkerGlobalScope {

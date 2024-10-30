@@ -260,18 +260,6 @@ class CTFactorGraph(FactorGraph):
                     {node[0]: {"InitialBelief_0": 1 - prior, "InitialBelief_1": prior}},
                 )
 
-
-def generate_ct_factor_graphs(list_of_factor_graphs, graph_type="Taxons"):
-    if type(list_of_factor_graphs) is not list:
-        list_of_factor_graphs = [list_of_factor_graphs]
-    for graph in list_of_factor_graphs:
-        ct_factor_graph = CTFactorGraph(
-            graph, graph_type
-        )  # ListOfCTFactorGraphs.append(CTFactorGraph(Graph,GraphType))
-    # TODO Tanja: shouldn't this return all factor graphs???
-    return ct_factor_graph
-
-
 def generate_pepgm_graph(
     taxa_weights_data_frame: pd.DataFrame
 ) -> CTFactorGraph:
@@ -279,4 +267,4 @@ def generate_pepgm_graph(
     taxon_graph.create_from_taxa_weights(taxa_weights_data_frame)
     factor_graph = FactorGraph()
     factor_graph.construct_from_existing_graph(taxon_graph)
-    return generate_ct_factor_graphs(factor_graph)
+    return CTFactorGraph(factor_graph, "Taxons")

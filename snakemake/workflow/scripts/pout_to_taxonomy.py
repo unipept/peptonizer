@@ -50,10 +50,10 @@ with gzip.open(args.pout_file, 'rt', encoding='utf-8') as file:
     file_contents = file.read()
 
 # Parse the input MS2Rescore file
-pep_score_psm = parse_ms2rescore_output(file_contents, args.fdr)
+pep_score, pep_psm_counts = parse_ms2rescore_output(file_contents, args.fdr)
 
 unipept_response = fetch_unipept_taxon_information(
-    pep_score_psm,
+    list(pep_score.keys()),
     args.taxonomy_query,
     args.taxon_rank,
     args.log_file

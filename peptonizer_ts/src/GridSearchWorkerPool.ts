@@ -2,11 +2,15 @@ import async from "async";
 import { GridSearchProgressListener } from "./GridSearchProgressListener.ts";
 import ExecutePepGMWorker from './workers/ExecutePepGMWorker.ts?worker&inline';
 
-type BeliefPropagationTask = {
-    graph: string,
+type BeliefPropagationParameters = {
     alpha: number,
     beta: number,
-    prior: number,
+    prior: number
+}
+
+type BeliefPropagationTask = {
+    graph: string,
+    parameters: BeliefPropagationParameters
     progressListener: GridSearchProgressListener
 }
 
@@ -83,16 +87,21 @@ class GridSearchWorkerPool {
                                     [onSuccess, onError, task.progressListener]
                                 );
 
+                                const params = task.parameters;
+
                                 // Notify the progress listener that we've started training a new graph with different
                                 // parameters.
-                                task.progressListener.gridUpdated(task.alpha, task.beta, task.prior, this.currentId % this.numberOfWorkers);
+                                task.progressListener.gridUpdated(
+                                    params,
+                                    this.currentId % this.numberOfWorkers
+                                );
 
                                 // The progressListener itself cannot be sent to the worker!
                                 worker.postMessage({
                                     graph: task.graph,
-                                    alpha: task.alpha,
-                                    beta: task.beta,
-                                    prior: task.prior,
+                                    alpha: task.parameters.alpha,
+                                    beta: task.parameters.beta,
+                                    prior: task.parameters.prior,
                                     id: this.currentId
                                 });
                             });
@@ -142,9 +151,11 @@ class GridSearchWorkerPool {
                         this.queue.push(
                             {
                                 graph,
-                                alpha,
-                                beta,
-                                prior,
+                                parameters: {
+                                    alpha,
+                                    beta,
+                                    prior
+                                },
                                 progressListener
                             },
                             // @ts-ignore
@@ -174,4 +185,4 @@ class GridSearchWorkerPool {
 }
 
 export { GridSearchWorkerPool };
-export type { BeliefPropagationResult };
+export type { BeliefPropagationResult, BeliefPropagationParameters };

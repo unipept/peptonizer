@@ -57,7 +57,8 @@ def get_lineage_at_specified_rank(tax_ids: List[int], taxa_rank: str) -> List[in
 
 def perform_taxa_weighing(
     unipept_responses: List[any],
-    pept_scores: Dict[str, Dict[str, float | int]],
+    pep_scores: Dict[str, float],
+    pep_psm_counts: Dict[str, int],
     max_taxa,
     taxa_rank="species"
 ):
@@ -67,7 +68,7 @@ def perform_taxa_weighing(
     ----------
     unipept_responses: List[any]
         Peptide counts that have already been processed by Unipept before.
-    pept_scores: Dict[str, Dict[str, float | int]]
+    pep_scores: Dict[str, Dict[str, float | int]]
         Dictionary that maps each peptide string onto an object containing the score associated to this peptide and the
         psm count.
     max_taxa: int
@@ -87,14 +88,24 @@ def perform_taxa_weighing(
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
     unipept_frame = pd.json_normalize(unipept_responses)
+
+    scores = unipept_frame["sequence"].map(pep_scores)
+    scores.name = "score"
+
+    psms = unipept_frame["sequence"].map(pep_psm_counts)
+    psms.name = "psms"
+
     # Merge psm_score and number of psms
     unipept_frame = pd.concat(
         [
             unipept_frame,
-            pd.json_normalize(unipept_frame["sequence"].map(pept_scores)),
+            scores,
+            psms
         ],
         axis=1,
     )
+
+    print(unipept_frame)
 
     # Score the degeneracy of a taxa, i.e.,
     # how conserved a peptide sequence is between taxa.

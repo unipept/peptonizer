@@ -1,7 +1,6 @@
-import requests
 import logging
 
-from typing import Dict, Tuple, List, Any
+from typing import Dict, List, Any
 
 from .request_manager import RequestManager
 from .taxon_manager import TaxonManager
@@ -9,11 +8,8 @@ from .taxon_manager import TaxonManager
 UNIPEPT_URL = "https://api.unipept.ugent.be"
 UNIPEPT_PEPT2FILTERED_ENDPOINT = "/mpa/pept2filtered.json"
 
-UNIPEPT_PEPTIDES_BATCH_SIZE = 500
+UNIPEPT_PEPTIDES_BATCH_SIZE = 2000
 
-
-# TODO check if we should still take into account the cutoff parameter? Maybe this is no longer an issue because
-# of the new Unipept API...
 def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -> List[Any]:
     url = UNIPEPT_URL + UNIPEPT_PEPT2FILTERED_ENDPOINT
     filtered_peptides = []
@@ -62,7 +58,7 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
 
 
 def fetch_unipept_taxon_information(
-    peptide_scores: Dict[str, Dict[str, float | int]],
+    peptides: List[str],
     taxonomy_query: str,
     rank: str,
     log_file: str
@@ -71,5 +67,5 @@ def fetch_unipept_taxon_information(
     logging.basicConfig(filename=log_file, level=logging.INFO)
 
     taxa_filter = TaxonManager.get_descendants_for_taxa([int(item) for item in taxonomy_query.split(",")], rank)
-    return query_unipept_and_filter_taxa(list(peptide_scores.keys()), taxa_filter)
+    return query_unipept_and_filter_taxa(peptides, taxa_filter)
 

@@ -3,6 +3,7 @@ import typescriptLogo from "./typescript.svg"
 import peptonizerLogo from "./peptonizer.jpg"
 import { GridSearchProgressListener } from "./GridSearchProgressListener.ts";
 import { Peptonizer } from "./Peptonizer.ts";
+import {BeliefPropagationParameters} from "./GridSearchWorkerPool.ts";
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML= `
   <div id="app">
@@ -103,12 +104,10 @@ class ProgressListener implements GridSearchProgressListener {
     }
 
     gridUpdated(
-        currentAlpha: number,
-        currentBeta: number,
-        currentPrior: number,
+        params: BeliefPropagationParameters,
         workerId: number
     ) {
-        this.progressViews[workerId].gridProgressView.innerHTML = `Currently training model with parameters α = ${currentAlpha}, β = ${currentBeta}, γ = ${currentPrior}.`
+        this.progressViews[workerId].gridProgressView.innerHTML = `Currently training model with parameters α = ${params.alpha}, β = ${params.beta}, γ = ${params.prior}.`
     }
 
     graphsUpdated(
