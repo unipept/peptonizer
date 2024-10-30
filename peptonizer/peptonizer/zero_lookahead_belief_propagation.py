@@ -352,7 +352,7 @@ class Messages:
 
         # first, do 5 loops where I update all messages
         print(f"Time spent in loop 0/{max_loops}: 0s")
-        for k in range(0, 5):
+        for k in range(0, 1):
             start_t = time.time()
             self.compute_update()
             self.msg_log = self.msg.copy()
