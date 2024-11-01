@@ -1,7 +1,7 @@
 # ** Input / output settings **
 
 # Which file should be used as input for the whole pipeline?
-input_file: '../resources/S11.psms.tsv.gz'
+input_file: '../resources/S03.tsv'
 
 # In which directory should all output (and intermediate) files be stored. This directory is relative to the location of
 # the Snakefile.
@@ -15,19 +15,8 @@ benchmark_dir: '../benchmarks'
 
 # ** Analysis specific parameters**
 
-# Which taxon should all queried taxa be a child of? (2 is bacteria, meaning that we are only looking for bacteria in
-# our input sample).
-taxon_query: 2
-
-# At which NCBI rank should the output taxa be situated?
-taxon_rank: 'species'
-
-# How many taxa should be reported (at maximum) by the tool?
-number_of_taxa: 50
-
-# False Discovery Rate that is used for the psms found in the input file. Only psms with an FDR lower than the value
-# provided here will be used as input to the pipeline.
-fdr: 0.01
+# How many taxa are being used in the graphical model?
+taxa_in_graph: 100
 
 # Increments of alpha parameter to use for the grid search
 alpha: [0.8, 0.9, 0.99]
@@ -44,6 +33,15 @@ regularized: True
 
 # How many taxa should be shown in the final barplot?
 taxa_in_plot: 25
+
+# ** Unipept specific parameters **
+
+# Which taxon should all queried taxa be a child of? (2 is bacteria, meaning that we are only looking for bacteria in
+# our input sample).
+taxon_query: [2]
+
+# At which NCBI rank should the output taxa be situated?
+taxon_rank: 'species'
 
 # ** Advanced parameters **
 

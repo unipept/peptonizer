@@ -2,7 +2,7 @@ import argparse
 import gzip
 import json
 
-from peptonizer.peptonizer import perform_taxa_weighing, parse_ms2rescore_output
+from peptonizer.peptonizer import perform_taxa_weighing, parse_peptide_tsv
 
 parser = argparse.ArgumentParser()
 
@@ -42,22 +42,16 @@ parser.add_argument(
     required=True,
     help="Input: path to percolator (ms2rescore) '.pout' file.",
 )
-parser.add_argument(
-    "--fdr",
-    type=float,
-    required=True,
-    help="Min peptide score for the peptide to be included in the search.",
-)
 
 
 args = parser.parse_args()
 
 
-with gzip.open(args.pout_file, 'rt', encoding='utf-8') as file:
+with open(args.pout_file, 'rt', encoding='utf-8') as file:
     file_contents = file.read()
 
 # Parse the input MS2Rescore file
-pep_score, pep_psm_counts = parse_ms2rescore_output(file_contents, args.fdr)
+pep_score, pep_psm_counts = parse_peptide_tsv(file_contents)
 
 
 # Parse the Unipept response file

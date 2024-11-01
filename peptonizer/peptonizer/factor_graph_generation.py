@@ -27,8 +27,8 @@ class TaxonGraph(nx.Graph):
             lambda row: (
                 row["sequence"],
                 {
-                    "InitialBelief_0": float(row["score"]),
-                    "InitialBelief_1": 1 - float(row["score"]),
+                    "InitialBelief_0": 1 - float(row["score"]),
+                    "InitialBelief_1": float(row["score"]),
                     "category": "peptide",
                 },
             ),

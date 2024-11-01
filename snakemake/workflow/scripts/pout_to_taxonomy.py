@@ -1,8 +1,7 @@
 import argparse
-import gzip
 import json
 
-from peptonizer.peptonizer import parse_ms2rescore_output, fetch_unipept_taxon_information
+from peptonizer.peptonizer import parse_peptide_tsv, fetch_unipept_taxon_information
 
 
 parser = argparse.ArgumentParser()
@@ -13,16 +12,10 @@ parser.add_argument(
     help="Taxa that should be used to query in Unipept. If querying all taxa, put [1].",
 )
 parser.add_argument(
-    "--fdr",
-    type=float,
-    required=True,
-    help="Min peptide score for the peptide to be included in the search.",
-)
-parser.add_argument(
-    "--pout-file",
+    "--input-file",
     type=str,
     required=True,
-    help="Input: path to percolator (ms2rescore) '.pout' file.",
+    help="Input: path to peptide and score '.tsv' file.",
 )
 parser.add_argument(
     "--unipept-response-file",
@@ -46,11 +39,11 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-with gzip.open(args.pout_file, 'rt', encoding='utf-8') as file:
+with open(args.input_file, 'rt', encoding='utf-8') as file:
     file_contents = file.read()
 
-# Parse the input MS2Rescore file
-pep_score, pep_psm_counts = parse_ms2rescore_output(file_contents, args.fdr)
+# Parse the input TSV file
+pep_score, pep_psm_counts = parse_peptide_tsv(file_contents)
 
 unipept_response = fetch_unipept_taxon_information(
     list(pep_score.keys()),
