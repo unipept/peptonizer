@@ -13,11 +13,6 @@ log_dir: '../logs'
 # Where should we store all benchmark results?
 benchmark_dir: '../benchmarks'
 
-# ** Database settings **
-
-# Reference DB used
-reference_db_name: 'SIHUMI_DB1UNIPROT'
-
 # ** Analysis specific parameters**
 
 # Which taxon should all queried taxa be a child of? (2 is bacteria, meaning that we are only looking for bacteria in
