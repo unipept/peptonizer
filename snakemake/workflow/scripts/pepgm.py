@@ -8,10 +8,10 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument(
-    "--graphml-path",
+    "--communities-graphml-path",
     type=str,
     required=True,
-    help="Path to where the GraphML file of the factor graph is stored.",
+    help="Path to where the GraphML file of the factor graph (using Louvain communities) is stored.",
 )
 parser.add_argument(
     "--max-iter",
@@ -54,7 +54,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-with open(args.graphml_path, 'r') as in_file:
+with open(args.communities_graphml_path, 'r') as in_file:
     csv_content = run_belief_propagation(
         in_file.read(),
         args.alpha,

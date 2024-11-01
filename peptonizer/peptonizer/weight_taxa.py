@@ -1,6 +1,8 @@
 import json
+from collections import defaultdict
 from typing import List, Dict
 
+import random
 import numpy as np
 import pandas as pd
 
@@ -55,9 +57,32 @@ def get_lineage_at_specified_rank(tax_ids: List[int], taxa_rank: str) -> List[in
     return [lineages[tax][rank_idx] for tax in tax_ids]
 
 
+def compute_taxa_distribution(objects):
+    distribution = defaultdict(int)
+    for obj in objects:
+        taxa_length = len(obj['taxa'])
+        distribution[taxa_length] += 1
+    return dict(distribution)
+
+
+def weighted_random_sample(objects, n):
+    # Calculate weights based on the length of the taxa array
+    weights = [1 / len(obj['taxa']) if obj['taxa'] else 0 for obj in objects]
+
+    # Normalize weights
+    total_weight = sum(weights)
+    normalized_weights = [weight / total_weight for weight in weights]
+
+    # Sample n objects based on the normalized weights
+    sampled_objects = random.choices(objects, weights=normalized_weights, k=n)
+
+    return sampled_objects
+
+
 def perform_taxa_weighing(
     unipept_responses: List[any],
-    pept_scores: Dict[str, Dict[str, float | int]],
+    pep_scores: Dict[str, float],
+    pep_psm_counts: Dict[str, int],
     max_taxa,
     taxa_rank="species"
 ):
@@ -67,7 +92,7 @@ def perform_taxa_weighing(
     ----------
     unipept_responses: List[any]
         Peptide counts that have already been processed by Unipept before.
-    pept_scores: Dict[str, Dict[str, float | int]]
+    pep_scores: Dict[str, Dict[str, float | int]]
         Dictionary that maps each peptide string onto an object containing the score associated to this peptide and the
         psm count.
     max_taxa: int
@@ -83,15 +108,27 @@ def perform_taxa_weighing(
     """
     print("Parsing Unipept responses from disk...")
 
+    unipept_responses = weighted_random_sample(unipept_responses, 15000)
+
+    print(f"Using {len(unipept_responses)} sequences as input...")
+
     # Convert a JSON object into a Pandas DataFrame
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
     unipept_frame = pd.json_normalize(unipept_responses)
+
+    scores = unipept_frame["sequence"].map(pep_scores)
+    scores.name = "score"
+
+    psms = unipept_frame["sequence"].map(pep_psm_counts)
+    psms.name = "psms"
+
     # Merge psm_score and number of psms
     unipept_frame = pd.concat(
         [
             unipept_frame,
-            pd.json_normalize(unipept_frame["sequence"].map(pept_scores)),
+            scores,
+            psms
         ],
         axis=1,
     )

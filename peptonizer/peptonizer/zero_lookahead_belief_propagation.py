@@ -104,7 +104,6 @@ class Messages:
 
     # class that holds the messages of iteration t and iteration t+1 as dictionaries
     def __init__(self, ct_graph_in: CTFactorGraph):
-        # TODO check if I truly need all three of msg new, msglog and msg.
         self.max_val: Optional[Tuple[int, int]] = None
         self.priorities: pqdict = pqdict({}, reverse=True)
         self.category: Category = Category[ct_graph_in.category]
