@@ -5,7 +5,7 @@ from typing import Dict, List, Any
 from .request_manager import RequestManager
 from .taxon_manager import TaxonManager
 
-UNIPEPT_URL = "https://api.unipept.ugent.be"
+UNIPEPT_URL = "http://api.unipept.ugent.be"
 UNIPEPT_PEPT2FILTERED_ENDPOINT = "/mpa/pept2filtered.json"
 
 UNIPEPT_PEPTIDES_BATCH_SIZE = 2000
@@ -29,7 +29,7 @@ def query_unipept_and_filter_taxa(peptides: List[str], taxa_filter: List[int]) -
         # Prepare the request payload
         payload = {
             "peptides": batch,
-            "tryptic": False
+            "tryptic": True
         }
 
         # Perform the HTTP POST request

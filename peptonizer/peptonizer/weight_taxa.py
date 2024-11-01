@@ -1,6 +1,8 @@
 import json
+from collections import defaultdict
 from typing import List, Dict
 
+import random
 import numpy as np
 import pandas as pd
 
@@ -55,6 +57,28 @@ def get_lineage_at_specified_rank(tax_ids: List[int], taxa_rank: str) -> List[in
     return [lineages[tax][rank_idx] for tax in tax_ids]
 
 
+def compute_taxa_distribution(objects):
+    distribution = defaultdict(int)
+    for obj in objects:
+        taxa_length = len(obj['taxa'])
+        distribution[taxa_length] += 1
+    return dict(distribution)
+
+
+def weighted_random_sample(objects, n):
+    # Calculate weights based on the length of the taxa array
+    weights = [1 / len(obj['taxa']) if obj['taxa'] else 0 for obj in objects]
+
+    # Normalize weights
+    total_weight = sum(weights)
+    normalized_weights = [weight / total_weight for weight in weights]
+
+    # Sample n objects based on the normalized weights
+    sampled_objects = random.choices(objects, weights=normalized_weights, k=n)
+
+    return sampled_objects
+
+
 def perform_taxa_weighing(
     unipept_responses: List[any],
     pep_scores: Dict[str, float],
@@ -84,6 +108,10 @@ def perform_taxa_weighing(
     """
     print("Parsing Unipept responses from disk...")
 
+    unipept_responses = weighted_random_sample(unipept_responses, 15000)
+
+    print(f"Using {len(unipept_responses)} sequences as input...")
+
     # Convert a JSON object into a Pandas DataFrame
     # record_path Parameter is used to specify the path to the nested list or dictionary that you want to normalize
     print("Normalizing peptides and converting to dataframe...")
@@ -104,8 +132,6 @@ def perform_taxa_weighing(
         ],
         axis=1,
     )
-
-    print(unipept_frame)
 
     # Score the degeneracy of a taxa, i.e.,
     # how conserved a peptide sequence is between taxa.

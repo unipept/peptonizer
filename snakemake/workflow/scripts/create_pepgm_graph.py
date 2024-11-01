@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument(
-    "--taxa-weights-dataframe-file",
+    "--sequence-scores-dataframe-file",
     type=str,
     required=True,
     help="Dataframe file containing the taxa weights that have been computed before.",
@@ -23,5 +23,5 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-ct_factor_graph = generate_pepgm_graph(pd.read_csv(args.taxa_weights_dataframe_file))
+ct_factor_graph = generate_pepgm_graph(pd.read_csv(args.sequence_scores_dataframe_file))
 ct_factor_graph.save_to_graph_ml(args.out)

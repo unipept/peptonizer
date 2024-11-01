@@ -123,7 +123,7 @@ rule CreateFullGraph:
     shell:
         """
         export PYTHONPATH={project_root}:${{PYTHONPATH:-}}
-        {params.run_command} scripts/create_pepgm_graph.py --sequence-scores-dataframe-file {input[0]} --out {output[0]} --use-communities False
+        {params.run_command} scripts/create_pepgm_graph.py --sequence-scores-dataframe-file {input[0]} --out {output[0]}
         """
 
 rule PerformTaxaClustering:
