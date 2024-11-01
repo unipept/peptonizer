@@ -5,3 +5,5 @@ from .unipept_get_taxonomy_from_pout import fetch_unipept_taxon_information
 from .weight_taxa import perform_taxa_weighing
 from .factor_graph_generation import generate_pepgm_graph
 from .extract_taxon_scores import extract_taxon_scores
+from .analyse_grid_search import find_best_parameters, ParameterSet
+from .taxa_clustering import cluster_taxa_based_on_similarity

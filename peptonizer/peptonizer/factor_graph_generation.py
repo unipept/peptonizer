@@ -42,14 +42,7 @@ class TaxonGraph(nx.Graph):
         intermediate_graph.add_nodes_from(peptide_attributes)
         intermediate_graph.add_nodes_from(taxa_attributes)
 
-        # cluster the resulting graph with the louvain algorithm
-        communities = nx.community.louvain_communities(intermediate_graph, seed=12345)
-
-        # separate the graph into its communities and enter into same graph object
-        for i, community in enumerate(communities):
-            subgraph = intermediate_graph.subgraph(community)
-            self.add_edges_from(subgraph.edges)
-
+        self.add_edges_from(intermediate_graph.edges)
         self.add_nodes_from(peptide_attributes)
         self.add_nodes_from(taxa_attributes)
 
